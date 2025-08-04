@@ -4,7 +4,7 @@ import secrets
 from supabase import create_client, Client
 from fastapi import HTTPException
 from dotenv import load_dotenv
-from models import RegisterRequest, LoginRequest, AuthResponse, ProfileSyncRequest, UserRole
+from models import RegisterRequest, LoginRequest, AuthResponse, ProfileSyncRequest, UserRole, PasswordUpdateRequest
 
 load_dotenv()
 
@@ -176,6 +176,54 @@ class AuthService:
                 )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")
+
+    @staticmethod
+    async def update_password(request: PasswordUpdateRequest) -> AuthResponse:
+        try:
+            # Get user profile
+            profile_response = supabase_admin.table("profiles").select("*").eq("id", request.user_id).execute()
+
+            if not profile_response.data:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            profile = profile_response.data[0]
+
+            # Check if password fields exist
+            if not profile.get("password_salt") or not profile.get("password_hash"):
+                raise HTTPException(status_code=400, detail="Account not set up for password login")
+
+            # Verify current password
+            if not AuthService.verify_password(request.current_password, profile["password_salt"], profile["password_hash"]):
+                raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+            # Check if new password is different from current
+            if AuthService.verify_password(request.new_password, profile["password_salt"], profile["password_hash"]):
+                raise HTTPException(status_code=400, detail="New password must be different from current password")
+
+            # Hash new password
+            salt, hashed_password = AuthService.hash_password(request.new_password)
+
+            # Update password in database
+            update_response = supabase_admin.table("profiles").update({
+                "password_salt": salt,
+                "password_hash": hashed_password
+            }).eq("id", request.user_id).execute()
+
+            if not update_response.data:
+                raise HTTPException(status_code=500, detail="Failed to update password")
+
+            return AuthResponse(
+                access_token="",
+                user_id=request.user_id,
+                role=profile.get("role", "student"),
+                full_name=profile.get("full_name", "User"),
+                message="Password updated successfully"
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Password update failed: {str(e)}")
 
     @staticmethod
     async def sync_profile(request: ProfileSyncRequest) -> AuthResponse:

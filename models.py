@@ -29,6 +29,11 @@ class ProfileSyncRequest(BaseModel):
     full_name: str
     role: UserRole = UserRole.STUDENT
 
+class PasswordUpdateRequest(BaseModel):
+    user_id: str
+    current_password: str
+    new_password: str
+
 class ErrorResponse(BaseModel):
     error: str
-    message: str 
+    message: str

@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from auth import AuthService
-from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse
+from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse, PasswordUpdateRequest
 
 app = FastAPI(
     title="LearnSphere API",
@@ -57,6 +57,16 @@ async def google_callback(code: str = Query(...), state: str = Query(...)):
     """Handle Google OAuth callback"""
     try:
         return await AuthService.handle_google_callback(code, state)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/update-password", response_model=AuthResponse)
+async def update_password(request: PasswordUpdateRequest):
+    """Update user password"""
+    try:
+        return await AuthService.update_password(request)
     except HTTPException:
         raise
     except Exception as e:

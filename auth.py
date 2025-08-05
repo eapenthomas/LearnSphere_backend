@@ -4,7 +4,9 @@ import secrets
 from supabase import create_client, Client
 from fastapi import HTTPException
 from dotenv import load_dotenv
-from models import RegisterRequest, LoginRequest, AuthResponse, ProfileSyncRequest, UserRole, PasswordUpdateRequest
+from models import RegisterRequest, LoginRequest, AuthResponse, ProfileSyncRequest, UserRole, PasswordUpdateRequest, ForgotPasswordRequest, VerifyOTPRequest, ForgotPasswordResponse, EmailCheckRequest, EmailCheckResponse
+from email_service import email_service
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -224,6 +226,145 @@ class AuthService:
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Password update failed: {str(e)}")
+
+    @staticmethod
+    async def check_email_availability(request: EmailCheckRequest) -> EmailCheckResponse:
+        try:
+            # Get all profiles to check if email exists
+            all_profiles = supabase_admin.table("profiles").select("email").execute()
+
+            # Check if email already exists (case-insensitive)
+            email_exists = False
+            for profile in all_profiles.data or []:
+                if profile.get("email") and profile.get("email").lower() == request.email.lower():
+                    email_exists = True
+                    break
+
+            return EmailCheckResponse(
+                email=request.email,
+                exists=email_exists,
+                message="Email is already registered" if email_exists else "Email is available"
+            )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Email check failed: {str(e)}")
+
+    @staticmethod
+    async def forgot_password(request: ForgotPasswordRequest) -> ForgotPasswordResponse:
+        try:
+            # Check if user exists
+            all_profiles = supabase_admin.table("profiles").select("*").execute()
+
+            profile = None
+            for p in all_profiles.data or []:
+                if p.get("email") and p.get("email").lower() == request.email.lower():
+                    profile = p
+                    break
+
+            if not profile:
+                # For security, don't reveal if email exists or not
+                return ForgotPasswordResponse(
+                    message="If an account with this email exists, you will receive a password reset code.",
+                    email=request.email
+                )
+
+            # Check if account is set up for password login
+            if not profile.get("password_salt") or not profile.get("password_hash"):
+                raise HTTPException(status_code=400, detail="This account is not set up for password login. Please use Google login or contact support.")
+
+            # Generate OTP
+            otp_code = email_service.generate_otp()
+            expires_at = datetime.utcnow() + timedelta(minutes=10)  # OTP expires in 10 minutes
+
+            # Store OTP in database
+            otp_data = {
+                "email": request.email.lower(),
+                "otp_code": otp_code,
+                "expires_at": expires_at.isoformat(),
+                "is_used": False
+            }
+
+            otp_response = supabase_admin.table("password_reset_otps").insert(otp_data).execute()
+
+            if not otp_response.data:
+                raise HTTPException(status_code=500, detail="Failed to generate password reset code")
+
+            # Send OTP email
+            user_name = profile.get("full_name", "User")
+            email_sent = email_service.send_otp_email(request.email, otp_code, user_name)
+
+            if not email_sent and email_service.is_configured():
+                # If email service is configured but sending failed
+                raise HTTPException(status_code=500, detail="Failed to send password reset email")
+
+            return ForgotPasswordResponse(
+                message="If an account with this email exists, you will receive a password reset code.",
+                email=request.email
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Password reset request failed: {str(e)}")
+
+    @staticmethod
+    async def verify_otp_and_reset_password(request: VerifyOTPRequest) -> AuthResponse:
+        try:
+            # Find valid OTP
+            otp_response = supabase_admin.table("password_reset_otps").select("*").eq("email", request.email.lower()).eq("otp_code", request.otp_code).eq("is_used", False).execute()
+
+            if not otp_response.data:
+                raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+
+            otp_record = otp_response.data[0]
+
+            # Check if OTP is expired
+            expires_at = datetime.fromisoformat(otp_record["expires_at"].replace('Z', '+00:00'))
+            if datetime.utcnow().replace(tzinfo=expires_at.tzinfo) > expires_at:
+                raise HTTPException(status_code=400, detail="Verification code has expired")
+
+            # Find user profile
+            all_profiles = supabase_admin.table("profiles").select("*").execute()
+
+            profile = None
+            for p in all_profiles.data or []:
+                if p.get("email") and p.get("email").lower() == request.email.lower():
+                    profile = p
+                    break
+
+            if not profile:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Hash new password
+            salt, hashed_password = AuthService.hash_password(request.new_password)
+
+            # Update password in database
+            update_response = supabase_admin.table("profiles").update({
+                "password_salt": salt,
+                "password_hash": hashed_password
+            }).eq("id", profile["id"]).execute()
+
+            if not update_response.data:
+                raise HTTPException(status_code=500, detail="Failed to update password")
+
+            # Mark OTP as used
+            supabase_admin.table("password_reset_otps").update({
+                "is_used": True,
+                "used_at": datetime.utcnow().isoformat()
+            }).eq("id", otp_record["id"]).execute()
+
+            return AuthResponse(
+                access_token="",
+                user_id=profile["id"],
+                role=profile.get("role", "student"),
+                full_name=profile.get("full_name", "User"),
+                message="Password reset successfully"
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Password reset failed: {str(e)}")
 
     @staticmethod
     async def sync_profile(request: ProfileSyncRequest) -> AuthResponse:

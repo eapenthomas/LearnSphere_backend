@@ -34,6 +34,26 @@ class PasswordUpdateRequest(BaseModel):
     current_password: str
     new_password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp_code: str
+    new_password: str
+
+class EmailCheckRequest(BaseModel):
+    email: EmailStr
+
+class EmailCheckResponse(BaseModel):
+    email: str
+    exists: bool
+    message: str
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    email: str
+
 class ErrorResponse(BaseModel):
     error: str
     message: str

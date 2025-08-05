@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from auth import AuthService
-from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse, PasswordUpdateRequest
+from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse, PasswordUpdateRequest, ForgotPasswordRequest, VerifyOTPRequest, ForgotPasswordResponse, EmailCheckRequest, EmailCheckResponse
 
 app = FastAPI(
     title="LearnSphere API",
@@ -27,6 +27,16 @@ async def register(request: RegisterRequest):
     """Register a new user with email/password"""
     try:
         return await AuthService.register_user(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/check-email", response_model=EmailCheckResponse)
+async def check_email_availability(request: EmailCheckRequest):
+    """Check if email is already registered"""
+    try:
+        return await AuthService.check_email_availability(request)
     except HTTPException:
         raise
     except Exception as e:
@@ -67,6 +77,26 @@ async def update_password(request: PasswordUpdateRequest):
     """Update user password"""
     try:
         return await AuthService.update_password(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(request: ForgotPasswordRequest):
+    """Request password reset OTP"""
+    try:
+        return await AuthService.forgot_password(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/verify-otp-reset", response_model=AuthResponse)
+async def verify_otp_and_reset_password(request: VerifyOTPRequest):
+    """Verify OTP and reset password"""
+    try:
+        return await AuthService.verify_otp_and_reset_password(request)
     except HTTPException:
         raise
     except Exception as e:

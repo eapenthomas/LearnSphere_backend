@@ -23,6 +23,8 @@ class AuthResponse(BaseModel):
     role: str
     full_name: str
     message: str
+    approval_status: Optional[str] = None
+    is_active: Optional[bool] = True
 
 class ProfileSyncRequest(BaseModel):
     user_id: str

@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from auth import AuthService
 from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse, PasswordUpdateRequest, ForgotPasswordRequest, VerifyOTPRequest, ForgotPasswordResponse, EmailCheckRequest, EmailCheckResponse
+from notification_api import router as notification_router
+from admin_api import router as admin_router
+from quiz_api import router as quiz_router
 
 app = FastAPI(
     title="LearnSphere API",
@@ -17,6 +20,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(notification_router)
+app.include_router(admin_router)
+app.include_router(quiz_router)
 
 @app.get("/")
 async def root():

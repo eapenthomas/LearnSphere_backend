@@ -71,12 +71,53 @@ class AuthService:
             if not profile_response.data:
                 raise HTTPException(status_code=500, detail="Failed to create user profile")
 
+            # Get the created profile to check approval status
+            created_profile = profile_response.data[0]
+
+            # If this is a teacher, manually create the approval request
+            if request.role.value == "teacher":
+                try:
+                    # Create teacher approval request manually
+                    approval_request_data = {
+                        "teacher_id": user_id,
+                        "status": "pending"
+                    }
+
+                    approval_response = supabase_admin.table("teacher_approval_requests").insert(approval_request_data).execute()
+
+                    if not approval_response.data:
+                        print(f"Warning: Failed to create approval request for teacher {user_id}")
+
+                    # Try to send email notification (optional)
+                    try:
+                        email_data = {
+                            "recipient_email": "eapentkadamapuzha@gmail.com",
+                            "subject": "New Teacher Registration Request",
+                            "body": f"A new teacher has registered and is awaiting approval. Teacher: {request.full_name} ({request.email})",
+                            "notification_type": "teacher_registration"
+                        }
+                        supabase_admin.table("email_notifications").insert(email_data).execute()
+                    except Exception as email_error:
+                        print(f"Warning: Failed to create email notification: {email_error}")
+
+                except Exception as approval_error:
+                    print(f"Warning: Failed to create approval request: {approval_error}")
+                    # Don't fail the registration if approval request creation fails
+
+            # Determine message based on role
+            if request.role.value == "teacher":
+                message = "Teacher registration successful! Your account is pending admin approval. You will receive an email notification once approved."
+            else:
+                message = "User registered successfully. You can now login with your email and password."
+
             return AuthResponse(
                 access_token="",  # No token for manual registration
                 user_id=user_id,
                 role=request.role.value,
                 full_name=request.full_name,
-                message="User registered successfully. You can now login with your email and password."
+                message=message,
+                approval_status=created_profile.get("approval_status", "approved"),
+                is_active=created_profile.get("is_active", True)
             )
 
         except HTTPException:
@@ -117,7 +158,9 @@ class AuthService:
                 user_id=user_id,
                 role=profile.get("role", "student"),
                 full_name=profile.get("full_name", request.email.split("@")[0]),
-                message="Login successful"
+                message="Login successful",
+                approval_status=profile.get("approval_status", "approved"),
+                is_active=profile.get("is_active", True)
             )
 
         except HTTPException:

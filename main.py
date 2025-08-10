@@ -5,6 +5,11 @@ from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthRespon
 from notification_api import router as notification_router
 from admin_api import router as admin_router
 from quiz_api import router as quiz_router
+from course_materials_routes import router as course_materials_router
+from course_api import router as course_router, course_materials_router
+from assignments_api import router as assignments_router
+from enrollment_api import router as enrollment_router
+from student_deadlines_api import router as student_deadlines_router
 
 app = FastAPI(
     title="LearnSphere API",
@@ -25,6 +30,11 @@ app.add_middleware(
 app.include_router(notification_router)
 app.include_router(admin_router)
 app.include_router(quiz_router)
+app.include_router(course_materials_router)
+app.include_router(course_router)
+app.include_router(assignments_router)
+app.include_router(enrollment_router)
+app.include_router(student_deadlines_router)
 
 @app.get("/")
 async def root():

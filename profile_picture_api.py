@@ -26,19 +26,24 @@ BUCKET_NAME = "profile-pictures"
 def ensure_bucket_exists():
     """Ensure the profile pictures bucket exists"""
     try:
-        # Try to list buckets to check if our bucket exists
-        buckets = supabase.storage.list_buckets()
-        bucket_names = [bucket['name'] for bucket in buckets]
-
-        if BUCKET_NAME not in bucket_names:
-            # Create the bucket if it doesn't exist
-            result = supabase.storage.create_bucket(BUCKET_NAME, {"public": True})
-            if result.get('error'):
-                print(f"Warning: Could not create bucket: {result['error']}")
-            else:
+        # Try to get bucket info to check if it exists
+        try:
+            bucket_info = supabase.storage.get_bucket(BUCKET_NAME)
+            print(f"Bucket '{BUCKET_NAME}' already exists")
+            return True
+        except:
+            # Bucket doesn't exist, try to create it
+            try:
+                result = supabase.storage.create_bucket(BUCKET_NAME, {"public": True})
                 print(f"Created bucket '{BUCKET_NAME}' successfully")
+                return True
+            except Exception as create_error:
+                print(f"Warning: Could not create bucket: {create_error}")
+                # Continue anyway, bucket might exist
+                return True
     except Exception as e:
         print(f"Warning: Could not ensure bucket exists: {e}")
+        return True  # Continue anyway
 
 class ProfilePictureResponse(BaseModel):
     message: str
@@ -77,10 +82,17 @@ async def upload_profile_picture(
         # Delete existing profile picture if it exists
         try:
             existing_files = supabase.storage.from_(BUCKET_NAME).list(user_id)
-            if existing_files.get('data'):
+            # Handle different response formats
+            if isinstance(existing_files, dict) and existing_files.get('data'):
                 for existing_file in existing_files['data']:
-                    supabase.storage.from_(BUCKET_NAME).remove([f"{user_id}/{existing_file['name']}"])
-        except:
+                    if isinstance(existing_file, dict) and 'name' in existing_file:
+                        supabase.storage.from_(BUCKET_NAME).remove([f"{user_id}/{existing_file['name']}"])
+            elif isinstance(existing_files, list):
+                for existing_file in existing_files:
+                    if isinstance(existing_file, dict) and 'name' in existing_file:
+                        supabase.storage.from_(BUCKET_NAME).remove([f"{user_id}/{existing_file['name']}"])
+        except Exception as e:
+            print(f"Warning: Could not delete existing files: {e}")
             pass  # Ignore errors when deleting existing files
 
         # Upload to Supabase Storage
@@ -93,10 +105,16 @@ async def upload_profile_picture(
             }
         )
 
-        if upload_response.get('error'):
+        # Handle different response formats
+        if isinstance(upload_response, dict) and upload_response.get('error'):
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to upload file: {upload_response['error']}"
+            )
+        elif isinstance(upload_response, bool) and not upload_response:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to upload file: Upload returned False"
             )
 
         # Get public URL

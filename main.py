@@ -29,6 +29,7 @@ from teacher_reports_api import router as teacher_reports_router
 from teacher_rating_api import router as teacher_rating_router
 from profile_picture_api import router as profile_picture_router
 from course_progress_api import router as progress_router
+from quiz_generator_api import router as quiz_generator_router
 
 app = FastAPI(
     title="LearnSphere API",
@@ -62,6 +63,7 @@ app.include_router(teacher_rating_router)
 app.include_router(profile_picture_router)
 app.include_router(forum_router)
 app.include_router(progress_router)
+app.include_router(quiz_generator_router)
 
 @app.get("/")
 async def root():

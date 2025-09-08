@@ -96,7 +96,7 @@ async def get_teacher_ratings(teacher_id: str, limit: int = Query(10, ge=1, le=5
             profiles!teacher_ratings_student_id_fkey(full_name),
             courses(title)
         ''').eq('teacher_id', teacher_id).order('created_at', desc=True).limit(limit).execute()
-        
+
         ratings = []
         for rating in response.data:
             ratings.append(TeacherRatingResponse(
@@ -111,11 +111,14 @@ async def get_teacher_ratings(teacher_id: str, limit: int = Query(10, ge=1, le=5
                 created_at=datetime.fromisoformat(rating['created_at'].replace('Z', '+00:00')),
                 updated_at=datetime.fromisoformat(rating['updated_at'].replace('Z', '+00:00'))
             ))
-        
+
         return ratings
-        
+
     except Exception as e:
         print(f"Error fetching teacher ratings: {e}")
+        # If table doesn't exist, return empty list instead of error
+        if "does not exist" in str(e):
+            return []
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/teacher/{teacher_id}/summary", response_model=TeacherRatingSummary)
@@ -157,6 +160,15 @@ async def get_teacher_rating_summary(teacher_id: str):
         
     except Exception as e:
         print(f"Error fetching teacher rating summary: {e}")
+        # If table doesn't exist, return default summary
+        if "does not exist" in str(e):
+            return TeacherRatingSummary(
+                teacher_id=teacher_id,
+                teacher_name=teacher_name if 'teacher_name' in locals() else 'Unknown Teacher',
+                average_rating=0.0,
+                total_ratings=0,
+                rating_distribution={"5": 0, "4": 0, "3": 0, "2": 0, "1": 0}
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/student/{student_id}/rating/{teacher_id}/{course_id}")

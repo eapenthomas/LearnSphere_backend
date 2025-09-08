@@ -15,6 +15,7 @@ supabase = create_client(supabase_url, supabase_key)
 from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse, PasswordUpdateRequest, ForgotPasswordRequest, VerifyOTPRequest, ForgotPasswordResponse, EmailCheckRequest, EmailCheckResponse
 from notification_api import router as notification_router
 from admin_api import router as admin_router
+from admin_dashboard_api import router as admin_dashboard_router
 from quiz_api import router as quiz_router
 from notes_summarizer_api import router as notes_router
 from course_api import router as course_router
@@ -24,6 +25,9 @@ from assignments_api import router as assignments_router
 from enrollment_api import router as enrollment_router
 from student_deadlines_api import router as student_deadlines_router
 from teacher_analytics_api import router as teacher_analytics_router
+from teacher_reports_api import router as teacher_reports_router
+from teacher_rating_api import router as teacher_rating_router
+from profile_picture_api import router as profile_picture_router
 from course_progress_api import router as progress_router
 
 app = FastAPI(
@@ -44,6 +48,7 @@ app.add_middleware(
 # Include routers
 app.include_router(notification_router)
 app.include_router(admin_router)
+app.include_router(admin_dashboard_router)
 app.include_router(quiz_router)
 app.include_router(course_materials_router)
 app.include_router(course_router)
@@ -52,6 +57,9 @@ app.include_router(enrollment_router)
 app.include_router(student_deadlines_router)
 app.include_router(notes_router)
 app.include_router(teacher_analytics_router)
+app.include_router(teacher_reports_router)
+app.include_router(teacher_rating_router)
+app.include_router(profile_picture_router)
 app.include_router(forum_router)
 app.include_router(progress_router)
 

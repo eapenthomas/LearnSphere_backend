@@ -88,8 +88,8 @@ async def get_student_enrollments(student_id: str):
                 teacher_name=teacher.get("full_name", "Unknown Teacher"),
                 status=enrollment["status"],
                 progress=enrollment.get("progress", 0),
-                enrolled_at=enrollment["created_at"],
-                updated_at=enrollment["updated_at"]
+                enrolled_at=enrollment.get("enrolled_at", enrollment.get("created_at")),
+                updated_at=enrollment.get("updated_at", enrollment.get("enrolled_at", enrollment.get("created_at")))
             ))
         
         return enrollments
@@ -137,8 +137,8 @@ async def get_course_enrollments(course_id: str, teacher_id: str = Query(...)):
                 teacher_name=student.get("full_name", "Unknown Student"),
                 status=enrollment["status"],
                 progress=enrollment.get("progress", 0),
-                enrolled_at=enrollment["created_at"],
-                updated_at=enrollment["updated_at"]
+                enrolled_at=enrollment.get("enrolled_at", enrollment.get("created_at")),
+                updated_at=enrollment.get("updated_at", enrollment.get("enrolled_at", enrollment.get("created_at")))
             ))
         
         return enrollments
@@ -204,8 +204,8 @@ async def enroll_student(enrollment: EnrollmentCreate):
             teacher_name=teacher.get("full_name", "Unknown Teacher"),
             status=enrollment_data["status"],
             progress=enrollment_data.get("progress", 0),
-            enrolled_at=enrollment_data["created_at"],
-            updated_at=enrollment_data["updated_at"]
+            enrolled_at=enrollment_data.get("enrolled_at", enrollment_data.get("created_at")),
+            updated_at=enrollment_data.get("updated_at", enrollment_data.get("enrolled_at", enrollment_data.get("created_at")))
         )
         
     except HTTPException:
@@ -222,18 +222,48 @@ async def unenroll_student(enrollment_id: str, student_id: str = Query(...)):
         enrollment_response = supabase.table("enrollments").select("*").eq("id", enrollment_id).single().execute()
         if not enrollment_response.data:
             raise HTTPException(status_code=404, detail="Enrollment not found")
-        
+
         if enrollment_response.data["student_id"] != student_id:
             raise HTTPException(status_code=403, detail="You don't have permission to modify this enrollment")
-        
-        # Update enrollment status to inactive instead of deleting
-        response = supabase.table("enrollments").update({"status": "inactive"}).eq("id", enrollment_id).execute()
-        
+
+        # Update enrollment status to dropped instead of deleting
+        response = supabase.table("enrollments").update({"status": "dropped"}).eq("id", enrollment_id).execute()
+
         if not response.data:
             raise HTTPException(status_code=500, detail="Failed to unenroll student")
-        
+
         return {"message": "Successfully unenrolled from course"}
-        
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unenrolling student: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to unenroll student")
+
+@router.delete("/student/{student_id}/course/{course_id}")
+async def unenroll_student_from_course(student_id: str, course_id: str):
+    """Unenroll a student from a course using student_id and course_id."""
+    try:
+        # Find the enrollment
+        enrollment_response = supabase.table("enrollments").select("*").eq("student_id", student_id).eq("course_id", course_id).eq("status", "active").execute()
+        if not enrollment_response.data:
+            # Check if student was ever enrolled (but already dropped)
+            any_enrollment = supabase.table("enrollments").select("*").eq("student_id", student_id).eq("course_id", course_id).execute()
+            if any_enrollment.data:
+                return {"message": "Student is already unenrolled from this course"}
+            else:
+                raise HTTPException(status_code=404, detail="No enrollment found for this student and course")
+
+        enrollment_id = enrollment_response.data[0]["id"]
+
+        # Update enrollment status to dropped instead of deleting
+        response = supabase.table("enrollments").update({"status": "dropped"}).eq("id", enrollment_id).execute()
+
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Failed to unenroll student")
+
+        return {"message": "Successfully unenrolled from course"}
+
     except HTTPException:
         raise
     except Exception as e:

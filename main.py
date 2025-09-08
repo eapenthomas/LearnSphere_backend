@@ -1,15 +1,30 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from auth import AuthService
+import os
+from supabase import create_client
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Supabase client
+supabase_url = os.environ.get('SUPABASE_URL')
+supabase_key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+supabase = create_client(supabase_url, supabase_key)
 from models import RegisterRequest, LoginRequest, ProfileSyncRequest, AuthResponse, ErrorResponse, PasswordUpdateRequest, ForgotPasswordRequest, VerifyOTPRequest, ForgotPasswordResponse, EmailCheckRequest, EmailCheckResponse
 from notification_api import router as notification_router
 from admin_api import router as admin_router
 from quiz_api import router as quiz_router
+from notes_summarizer_api import router as notes_router
+from course_api import router as course_router
+from forum_api import router as forum_router
 from course_materials_routes import router as course_materials_router
-from course_api import router as course_router, course_materials_router
 from assignments_api import router as assignments_router
 from enrollment_api import router as enrollment_router
 from student_deadlines_api import router as student_deadlines_router
+from teacher_analytics_api import router as teacher_analytics_router
+from course_progress_api import router as progress_router
 
 app = FastAPI(
     title="LearnSphere API",
@@ -35,6 +50,10 @@ app.include_router(course_router)
 app.include_router(assignments_router)
 app.include_router(enrollment_router)
 app.include_router(student_deadlines_router)
+app.include_router(notes_router)
+app.include_router(teacher_analytics_router)
+app.include_router(forum_router)
+app.include_router(progress_router)
 
 @app.get("/")
 async def root():
@@ -129,6 +148,45 @@ async def sync_profile(request: ProfileSyncRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/validate-session")
+async def validate_session(authorization: str = Header(None)):
+    """Validate user session token"""
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+        token = authorization.split(" ")[1]
+
+        # For our simple implementation, token is the user ID
+        user_id = token
+
+        # Verify user exists and is active
+        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
+
+        if not response.data:
+            raise HTTPException(status_code=401, detail="Invalid session")
+
+        user = response.data[0]
+
+        # Check if account is still active
+        if not user.get('is_active', True):
+            raise HTTPException(status_code=401, detail="Account has been disabled")
+
+        return {
+            "valid": True,
+            "user_id": user['id'],
+            "role": user['role'],
+            "full_name": user['full_name'],
+            "approval_status": user.get('approval_status', 'approved'),
+            "is_active": user.get('is_active', True)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Session validation error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid session")
 
 @app.get("/health")
 async def health_check():

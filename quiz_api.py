@@ -282,26 +282,8 @@ async def get_teacher_courses(teacher_id: str):
 async def get_student_available_quizzes(student_id: str):
     """Get available quizzes for a student from their enrolled courses"""
     try:
-        # Create course_enrollments table if it doesn't exist
-        try:
-            supabase.table('course_enrollments').select('id').limit(1).execute()
-        except:
-            # Table doesn't exist, create it
-            create_table_sql = """
-            CREATE TABLE IF NOT EXISTS course_enrollments (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                student_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-                course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-                enrolled_at TIMESTAMPTZ DEFAULT NOW(),
-                status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'dropped')),
-                UNIQUE(student_id, course_id)
-            );
-            """
-            # Note: This would need to be executed via SQL in production
-            pass
-
-        # First get student's enrolled courses
-        enrolled_courses_response = supabase.table('course_enrollments').select('course_id').eq('student_id', student_id).eq('status', 'active').execute()
+        # Get student's enrolled courses from the enrollments table
+        enrolled_courses_response = supabase.table('enrollments').select('course_id').eq('student_id', student_id).eq('status', 'active').execute()
 
         if not enrolled_courses_response.data:
             return {
@@ -329,9 +311,51 @@ async def get_student_available_quizzes(student_id: str):
         else:
             submitted_quiz_ids = []
 
-        # Add submission status to each quiz
+        # Add submission status, question count, and time-based access to each quiz
+        from datetime import datetime, timezone
+        current_time = datetime.now(timezone.utc)
+
         for quiz in quizzes_response.data:
             quiz['is_submitted'] = quiz['id'] in submitted_quiz_ids
+
+            # Get question count for this quiz
+            questions_count_response = supabase.table('quiz_questions').select('id').eq('quiz_id', quiz['id']).execute()
+            quiz['questions'] = questions_count_response.data  # Add questions array for count
+            quiz['question_count'] = len(questions_count_response.data)
+
+            # Add time-based access control
+            quiz['is_accessible'] = True
+            quiz['access_message'] = ''
+
+            if quiz['start_time']:
+                try:
+                    start_time_str = quiz['start_time']
+                    if start_time_str.endswith('Z'):
+                        start_time_str = start_time_str[:-1] + '+00:00'
+                    start_time = datetime.fromisoformat(start_time_str)
+                    if start_time.tzinfo is None:
+                        start_time = start_time.replace(tzinfo=timezone.utc)
+
+                    if current_time < start_time:
+                        quiz['is_accessible'] = False
+                        quiz['access_message'] = f"Quiz opens on {start_time.strftime('%Y-%m-%d at %H:%M')}"
+                except Exception as e:
+                    print(f"Error parsing start_time: {e}")
+
+            if quiz['end_time']:
+                try:
+                    end_time_str = quiz['end_time']
+                    if end_time_str.endswith('Z'):
+                        end_time_str = end_time_str[:-1] + '+00:00'
+                    end_time = datetime.fromisoformat(end_time_str)
+                    if end_time.tzinfo is None:
+                        end_time = end_time.replace(tzinfo=timezone.utc)
+
+                    if current_time > end_time:
+                        quiz['is_accessible'] = False
+                        quiz['access_message'] = f"Quiz closed on {end_time.strftime('%Y-%m-%d at %H:%M')}"
+                except Exception as e:
+                    print(f"Error parsing end_time: {e}")
 
         return {
             "success": True,
@@ -357,10 +381,43 @@ async def get_quiz_for_student(quiz_id: str, student_id: str):
         ''').eq('id', quiz_id).eq('status', 'published').single().execute()
 
         # Check if student is enrolled in the course
-        enrollment_check = supabase.table('course_enrollments').select('id').eq('student_id', student_id).eq('course_id', quiz_response.data['course_id']).eq('status', 'active').execute()
+        enrollment_check = supabase.table('enrollments').select('id').eq('student_id', student_id).eq('course_id', quiz_response.data['course_id']).eq('status', 'active').execute()
 
         if not enrollment_check.data:
             raise HTTPException(status_code=403, detail="Student not enrolled in this course")
+
+        # Check time-based access
+        from datetime import datetime, timezone
+        current_time = datetime.now(timezone.utc)
+        quiz_data = quiz_response.data
+
+        if quiz_data['start_time']:
+            try:
+                start_time_str = quiz_data['start_time']
+                if start_time_str.endswith('Z'):
+                    start_time_str = start_time_str[:-1] + '+00:00'
+                start_time = datetime.fromisoformat(start_time_str)
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+
+                if current_time < start_time:
+                    raise HTTPException(status_code=403, detail=f"Quiz not yet available. Opens on {start_time.strftime('%Y-%m-%d at %H:%M')}")
+            except Exception as e:
+                print(f"Error parsing start_time in take quiz: {e}")
+
+        if quiz_data['end_time']:
+            try:
+                end_time_str = quiz_data['end_time']
+                if end_time_str.endswith('Z'):
+                    end_time_str = end_time_str[:-1] + '+00:00'
+                end_time = datetime.fromisoformat(end_time_str)
+                if end_time.tzinfo is None:
+                    end_time = end_time.replace(tzinfo=timezone.utc)
+
+                if current_time > end_time:
+                    raise HTTPException(status_code=403, detail=f"Quiz has expired. Closed on {end_time.strftime('%Y-%m-%d at %H:%M')}")
+            except Exception as e:
+                print(f"Error parsing end_time in take quiz: {e}")
 
         # Check if student has already submitted
         submission_check = supabase.table('quiz_submissions').select('id').eq('quiz_id', quiz_id).eq('student_id', student_id).execute()
@@ -473,7 +530,7 @@ async def enroll_student_in_course(student_id: str, course_id: str):
             'status': 'active'
         }
 
-        response = supabase.table('course_enrollments').insert(enrollment_data).execute()
+        response = supabase.table('enrollments').insert(enrollment_data).execute()
 
         return {
             "success": True,

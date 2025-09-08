@@ -139,15 +139,16 @@ async def fetch_quiz_deadlines(student_id: str, enrolled_courses: List[str]) -> 
                     full_name
                 )
             )
-        """).in_("course_id", enrolled_courses).eq("status", "active").execute()
+        """).in_("course_id", enrolled_courses).in_("status", ["active", "published"]).execute()
         
         deadlines = []
         for quiz in response.data:
             course = quiz.get("courses", {})
             teacher = course.get("profiles", {}) if course else {}
             
-            # Check if quiz has a due date
-            if not quiz.get("due_date"):
+            # Check if quiz has a due date (use end_time if due_date not available)
+            due_date_field = quiz.get("due_date") or quiz.get("end_time")
+            if not due_date_field:
                 continue
             
             # Check submission status
@@ -161,7 +162,7 @@ async def fetch_quiz_deadlines(student_id: str, enrolled_courses: List[str]) -> 
                 score = submission.get("score")
             
             # Determine priority based on due date
-            due_date = datetime.fromisoformat(quiz["due_date"].replace('Z', '+00:00'))
+            due_date = datetime.fromisoformat(due_date_field.replace('Z', '+00:00'))
             now = datetime.now(timezone.utc)
             days_until_due = (due_date - now).days
             
@@ -277,14 +278,14 @@ async def get_student_deadlines(
 async def get_upcoming_deadlines(
     student_id: str = Query(...),
     limit: int = Query(7, description="Number of upcoming deadlines to return"),
-    days_ahead: int = Query(30, description="Look ahead this many days")
+    days_ahead: int = Query(2, description="Look ahead this many days (default 2 for urgent deadlines)")
 ):
     """Get upcoming deadlines for the next N days."""
     try:
         # Calculate date range
         now = datetime.now(timezone.utc)
         end_date = now + timedelta(days=days_ahead)
-        
+
         # Get all deadlines in the range
         response = await get_student_deadlines(
             student_id=student_id,
@@ -292,13 +293,54 @@ async def get_upcoming_deadlines(
             end_date=end_date.isoformat(),
             include_completed=False
         )
-        
+
         # Return only the requested number of upcoming items
         upcoming = [event for event in response.events if event.due_date > now]
         return upcoming[:limit]
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching upcoming deadlines: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch upcoming deadlines")
+
+@router.get("/deadlines/urgent", response_model=List[DeadlineEvent])
+async def get_urgent_deadlines(
+    student_id: str = Query(...),
+    limit: int = Query(10, description="Number of urgent deadlines to return")
+):
+    """Get urgent deadlines (2 days or less) for student dashboard."""
+    try:
+        # Calculate date range for urgent deadlines (2 days)
+        now = datetime.now(timezone.utc)
+        urgent_date = now + timedelta(days=2)
+
+        # Get enrolled courses
+        enrolled_courses = await get_student_enrollments(student_id)
+
+        if not enrolled_courses:
+            return []
+
+        # Fetch urgent deadlines
+        all_deadlines = []
+
+        # Get urgent assignments
+        assignment_deadlines = await fetch_assignment_deadlines(student_id, enrolled_courses)
+        urgent_assignments = [d for d in assignment_deadlines if now < d.due_date <= urgent_date and d.submission_status == "not_submitted"]
+        all_deadlines.extend(urgent_assignments)
+
+        # Get urgent quizzes
+        quiz_deadlines = await fetch_quiz_deadlines(student_id, enrolled_courses)
+        urgent_quizzes = [d for d in quiz_deadlines if now < d.due_date <= urgent_date and d.submission_status == "not_submitted"]
+        all_deadlines.extend(urgent_quizzes)
+
+        # Sort by due date
+        all_deadlines.sort(key=lambda x: x.due_date)
+
+        return all_deadlines[:limit]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching urgent deadlines: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch urgent deadlines")

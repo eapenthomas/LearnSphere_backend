@@ -12,7 +12,7 @@ import logging
 from supabase import create_client, Client
 import uuid
 
-from s3_utils import get_s3_manager, S3Manager
+from supabase_storage import get_storage_manager, SupabaseStorageManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,6 +56,9 @@ class AssignmentResponse(BaseModel):
     teacher_name: Optional[str] = None
     submission_count: Optional[int] = 0
     total_students: Optional[int] = 0
+    submission_status: Optional[str] = None
+    submission_score: Optional[int] = None
+    submitted_at: Optional[datetime] = None
 
 class SubmissionCreate(BaseModel):
     assignment_id: str
@@ -144,7 +147,7 @@ async def create_assignment(
     max_score: int = Form(100),
     allow_late_submission: bool = Form(False),
     file: Optional[UploadFile] = File(None),
-    s3_manager: S3Manager = Depends(get_s3_manager)
+    storage_manager: SupabaseStorageManager = Depends(get_storage_manager)
 ):
     """Create a new assignment."""
     try:
@@ -170,9 +173,9 @@ async def create_assignment(
             # Reset file pointer for S3 upload
             await file.seek(0)
             
-            # Upload to S3 with assignments folder structure
-            s3_result = await s3_manager.upload_assignment_file(file, course_id)
-            file_url = s3_result["file_url"]
+            # Upload to Supabase Storage with assignments folder structure
+            storage_result = await storage_manager.upload_assignment_file(file, course_id)
+            file_url = storage_result["file_url"]
 
         # Parse due_date
         due_date_parsed = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
@@ -269,19 +272,21 @@ async def get_student_assignments(
         # Add submission status for each assignment
         assignments = []
         for assignment in response.data:
-            assignment_data = AssignmentResponse(**assignment)
-            
             # Check if student has submitted
             submission_response = supabase.table("assignment_submissions").select("*").eq("assignment_id", assignment["id"]).eq("student_id", student_id).execute()
-            
+
+            # Prepare assignment data with submission info
+            assignment_data = assignment.copy()
             if submission_response.data:
-                assignment_data.submission_status = submission_response.data[0]["status"]
-                assignment_data.submission_score = submission_response.data[0]["score"]
-                assignment_data.submitted_at = submission_response.data[0]["submitted_at"]
+                assignment_data["submission_status"] = submission_response.data[0]["status"]
+                assignment_data["submission_score"] = submission_response.data[0]["score"]
+                assignment_data["submitted_at"] = submission_response.data[0]["submitted_at"]
             else:
-                assignment_data.submission_status = "not_submitted"
-            
-            assignments.append(assignment_data)
+                assignment_data["submission_status"] = "not_submitted"
+                assignment_data["submission_score"] = None
+                assignment_data["submitted_at"] = None
+
+            assignments.append(AssignmentResponse(**assignment_data))
         
         return assignments
 
@@ -296,7 +301,7 @@ async def submit_assignment(
     assignment_id: str = Form(...),
     student_id: str = Form(...),
     file: UploadFile = File(...),
-    s3_manager: S3Manager = Depends(get_s3_manager)
+    storage_manager: SupabaseStorageManager = Depends(get_storage_manager)
 ):
     """Submit an assignment."""
     try:
@@ -343,14 +348,14 @@ async def submit_assignment(
         # Reset file pointer for S3 upload
         await file.seek(0)
 
-        # Upload to S3
-        s3_result = await s3_manager.upload_submission_file(file, assignment["course_id"], assignment_id, student_id)
+        # Upload to Supabase Storage
+        storage_result = await storage_manager.upload_submission_file(file, assignment["course_id"], assignment_id, student_id)
 
         # Create submission record
         submission_data = {
             "assignment_id": assignment_id,
             "student_id": student_id,
-            "file_url": s3_result["file_url"],
+            "file_url": storage_result["file_url"],
             "status": "late" if is_late else "submitted"
         }
 
@@ -462,7 +467,7 @@ async def download_file(
     file_type: str,  # 'assignment' or 'submission'
     file_id: str,
     user_id: str = Query(...),
-    s3_manager: S3Manager = Depends(get_s3_manager)
+    storage_manager: SupabaseStorageManager = Depends(get_storage_manager)
 ):
     """Generate download URL for assignment or submission file."""
     try:
@@ -490,8 +495,8 @@ async def download_file(
             if not assignment["file_url"]:
                 raise HTTPException(status_code=404, detail="No file attached to this assignment")
 
-            # Generate presigned URL
-            download_url = s3_manager.generate_presigned_url(assignment["file_url"])
+            # Generate download URL (Supabase URLs are already public)
+            download_url = storage_manager.get_file_download_url(assignment["file_url"], "assignments")
             return {"download_url": download_url}
 
         elif file_type == "submission":
@@ -515,8 +520,8 @@ async def download_file(
             else:
                 raise HTTPException(status_code=403, detail="Permission denied")
 
-            # Generate presigned URL
-            download_url = s3_manager.generate_presigned_url(submission["file_url"])
+            # Generate download URL (Supabase URLs are already public)
+            download_url = storage_manager.get_file_download_url(submission["file_url"], "assignments")
             return {"download_url": download_url}
 
         else:

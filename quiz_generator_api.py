@@ -258,6 +258,9 @@ class SaveQuizRequest(BaseModel):
     estimated_time: int
     course_id: str
     teacher_id: str
+    instructions: Optional[str] = ""
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 @router.post("/save-generated-quiz")
 async def save_generated_quiz(request: SaveQuizRequest):
@@ -274,7 +277,10 @@ async def save_generated_quiz(request: SaveQuizRequest):
             'teacher_id': request.teacher_id,
             'duration_minutes': request.estimated_time,
             'total_marks': len(request.questions),
-            'status': 'published'
+            'status': 'published',
+            'instructions': request.instructions or '',
+            'start_time': request.start_time if request.start_time else None,
+            'end_time': request.end_time if request.end_time else None
         }
         
         quiz_response = supabase.table('quizzes').insert(quiz_insert_data).execute()

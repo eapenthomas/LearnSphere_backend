@@ -8,6 +8,9 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from supabase import create_client
 from dotenv import load_dotenv
 
@@ -395,6 +398,15 @@ async def recalculate_course_progress(student_id: str, course_id: str):
         if is_completed:
             progress_data['completed_at'] = current_time.isoformat()
 
+            # Check if this is a new completion (not already completed)
+            was_previously_completed = False
+            if course_progress_response.data:
+                was_previously_completed = course_progress_response.data[0].get('is_completed', False)
+
+            # Send completion email if this is a new completion
+            if not was_previously_completed:
+                await send_course_completion_email(student_id, course_id)
+
         if course_progress_response.data:
             # Update existing progress
             supabase.table('course_progress').update(progress_data).eq('student_id', student_id).eq('course_id', course_id).execute()
@@ -411,3 +423,115 @@ async def recalculate_course_progress(student_id: str, course_id: str):
 
     except Exception as e:
         print(f"Error recalculating course progress: {e}")
+
+async def send_course_completion_email(student_id: str, course_id: str):
+    """Send email notification when student completes a course"""
+    try:
+        # Get student and course information
+        student_response = supabase.table('profiles').select('*').eq('id', student_id).single().execute()
+        course_response = supabase.table('courses').select('*').eq('id', course_id).single().execute()
+
+        if not student_response.data or not course_response.data:
+            print("Student or course not found for completion email")
+            return
+
+        student = student_response.data
+        course = course_response.data
+
+        # Email configuration
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_username = os.getenv('SMTP_USERNAME')
+        smtp_password = os.getenv('SMTP_PASSWORD')
+
+        if not smtp_username or not smtp_password:
+            print("SMTP credentials not configured, skipping email")
+            return
+
+        # Create email content
+        subject = f"🎉 Congratulations! You've completed {course['title']}"
+
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 28px;">🎉 Course Completed!</h1>
+                    <p style="margin: 10px 0 0 0; font-size: 18px;">Congratulations on your achievement!</p>
+                </div>
+
+                <div style="padding: 30px; background: #f8f9fa; border-radius: 10px; margin: 20px 0;">
+                    <h2 style="color: #667eea; margin-top: 0;">Dear {student['full_name']},</h2>
+
+                    <p>We're thrilled to congratulate you on successfully completing the course:</p>
+
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 20px 0;">
+                        <h3 style="margin: 0; color: #333;">{course['title']}</h3>
+                        <p style="margin: 5px 0 0 0; color: #666;">{course.get('description', 'Course completed successfully!')}</p>
+                    </div>
+
+                    <p>Your dedication and hard work have paid off! This achievement demonstrates your commitment to learning and personal growth.</p>
+
+                    <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <h4 style="margin: 0 0 10px 0; color: #1976d2;">🏆 What's Next?</h4>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li>Continue your learning journey with more courses</li>
+                            <li>Share your achievement with friends and colleagues</li>
+                            <li>Apply your new knowledge in real-world projects</li>
+                            <li>Leave a review to help other learners</li>
+                        </ul>
+                    </div>
+
+                    <p>Thank you for choosing LearnSphere for your educational journey. We're proud to be part of your success!</p>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="http://localhost:3000/dashboard" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold;">Continue Learning</a>
+                    </div>
+                </div>
+
+                <div style="text-align: center; color: #666; font-size: 14px; margin-top: 20px;">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                    <p style="margin-top: 20px;">
+                        <a href="http://localhost:3000" style="color: #667eea;">LearnSphere</a> |
+                        <a href="mailto:support@learnsphere.com" style="color: #667eea;">Support</a>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = smtp_username
+        msg['To'] = student['email']
+
+        # Add HTML content
+        html_part = MIMEText(html_body, 'html')
+        msg.attach(html_part)
+
+        # Send email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.send_message(msg)
+
+        print(f"Course completion email sent to {student['email']} for course {course['title']}")
+
+        # Log the email notification
+        try:
+            supabase.table('email_notifications').insert({
+                'recipient_id': student_id,
+                'subject': subject,
+                'content': html_body,
+                'type': 'course_completion',
+                'status': 'sent',
+                'sent_at': datetime.now(timezone.utc).isoformat()
+            }).execute()
+        except Exception as log_error:
+            print(f"Failed to log email notification: {log_error}")
+
+    except Exception as e:
+        print(f"Error sending course completion email: {e}")
+        # Don't raise the exception to avoid breaking the progress update

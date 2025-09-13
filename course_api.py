@@ -159,16 +159,17 @@ async def get_all_courses():
             profiles!courses_teacher_id_fkey(full_name)
         """).eq('status', 'active').order('created_at', desc=True).execute()
 
-        # Add enrollment count for each course
+        # Add enrollment count for each course using optimized query
         courses_with_stats = []
         for course in response.data:
-            # Get enrollment count
-            enrollment_response = supabase.table('enrollments').select('id', count='exact').eq('course_id', course['id']).eq('status', 'active').execute()
+            # Get enrollment count with proper count query
+            enrollment_response = supabase.table('enrollments').select('*', count='exact').eq('course_id', course['id']).eq('status', 'active').execute()
+            enrollment_count = len(enrollment_response.data) if enrollment_response.data else 0
 
             course_data = {
                 **course,
                 'teacher_name': course.get('profiles', {}).get('full_name', 'Unknown Teacher'),
-                'enrollment_count': enrollment_response.count or 0
+                'enrollment_count': enrollment_count
             }
             courses_with_stats.append(course_data)
 

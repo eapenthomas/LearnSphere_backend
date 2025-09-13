@@ -414,6 +414,72 @@ class SupabaseStorageManager:
             logger.error(f"Failed to upload thumbnail {file.filename}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Thumbnail upload failed: {str(e)}")
 
+    async def upload_profile_picture(self, file: UploadFile, user_id: str) -> Dict[str, Any]:
+        """
+        Upload a profile picture to Supabase Storage.
+
+        Args:
+            file: The uploaded profile picture file
+            user_id: ID of the user
+
+        Returns:
+            Dict containing file metadata including public URL
+        """
+        try:
+            # Validate file
+            if not file.filename:
+                raise HTTPException(status_code=400, detail="No filename provided")
+
+            # Read file content
+            file_content = await file.read()
+            file_size = len(file_content)
+
+            # Validate file size (max 5MB for profile pictures)
+            max_size = 5 * 1024 * 1024  # 5MB
+            if file_size > max_size:
+                raise HTTPException(status_code=400, detail=f"File size exceeds maximum limit of {max_size // (1024*1024)}MB")
+
+            # Ensure bucket exists
+            self._ensure_bucket_exists("profile-pictures")
+
+            # Generate unique filename with user folder
+            file_extension = os.path.splitext(file.filename)[1]
+            unique_filename = f"{user_id}/profile{file_extension}"
+
+            content_type = self._get_content_type(file.filename)
+
+            # Upload to Supabase Storage (using exact same pattern as course thumbnails)
+            response = self.supabase.storage.from_("profile-pictures").upload(
+                unique_filename,
+                file_content,
+                {
+                    'content-type': content_type,
+                    'upsert': True  # Allow overwriting existing profile pictures
+                }
+            )
+
+            # Check if upload was successful
+            if not response or (hasattr(response, 'error') and response.error):
+                error_msg = response.error if hasattr(response, 'error') else "Unknown upload error"
+                raise HTTPException(status_code=500, detail=f"Storage upload failed: {error_msg}")
+
+            # Generate public URL
+            public_url = self.supabase.storage.from_("profile-pictures").get_public_url(unique_filename)
+
+            logger.info(f"Successfully uploaded profile picture {file.filename} to Supabase Storage: {unique_filename}")
+
+            return {
+                'file_name': file.filename,
+                'file_url': public_url,
+                'storage_key': unique_filename,
+                'file_size': file_size,
+                'file_type': content_type
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to upload profile picture {file.filename}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Profile picture upload failed: {str(e)}")
+
     def delete_file(self, file_url: str, bucket_name: str) -> bool:
         """
         Delete a file from Supabase Storage using its URL.

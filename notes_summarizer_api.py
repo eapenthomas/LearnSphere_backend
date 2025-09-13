@@ -68,7 +68,7 @@ async def summarize_notes(
     3. Validates that the extracted text is non-empty and meaningful.
     4. Passes the extracted text into the Summarization Service with an
        academic-friendly prompt that ensures:
-         - Output ~900 words (flexible ±100 words).
+         - Output ~900 words (flexible ±200 words).
          - Simplified explanations for complex terms.
          - Covers all major sections, headings, examples, and definitions.
          - Student-friendly formatting (clear, structured, easy to revise).
@@ -103,7 +103,7 @@ async def summarize_notes(
             prompt=(
                 "You are an AI academic summarizer. Your task is to create a detailed, "
                 "well-structured, and student-friendly summary of the provided notes. "
-                "The summary should be around 900 words (±100), covering all major concepts, "
+                "The summary should be around 900 words (±200), covering all major concepts, "
                 "definitions, examples, and explanations in a clear way. Avoid skipping "
                 "important points. Simplify jargon, provide context where needed, and ensure "
                 "that the flow is logical (introduction → main points → examples → conclusion). "

@@ -153,6 +153,20 @@ class AuthService:
             if not AuthService.verify_password(request.password, profile["password_salt"], profile["password_hash"]):
                 raise HTTPException(status_code=400, detail="Invalid email or password")
 
+            # Check if user account is active
+            if not profile.get("is_active", True):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your account has been disabled. Please contact support for assistance."
+                )
+
+            # Check teacher approval status
+            if profile.get("role") == "teacher" and profile.get("approval_status") != "approved":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your teacher account is pending approval. Please wait for admin approval."
+                )
+
             return AuthResponse(
                 access_token="",  # No token for manual login
                 user_id=user_id,
@@ -212,12 +226,29 @@ class AuthService:
                 )
             else:
                 profile = profile_response.data[0]
+
+                # Check if user account is active
+                if not profile.get("is_active", True):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Your account has been disabled. Please contact support for assistance."
+                    )
+
+                # Check teacher approval status
+                if profile.get("role") == "teacher" and profile.get("approval_status") != "approved":
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Your teacher account is pending approval. Please wait for admin approval."
+                    )
+
                 return AuthResponse(
                     access_token=auth_response.session.access_token,
                     user_id=user_id,
                     role=profile["role"],
                     full_name=profile["full_name"],
-                    message="Google login successful"
+                    message="Google login successful",
+                    approval_status=profile.get("approval_status", "approved"),
+                    is_active=profile.get("is_active", True)
                 )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")

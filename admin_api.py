@@ -4,6 +4,7 @@ from typing import Optional
 import os
 from supabase import create_client, Client
 from datetime import datetime
+from admin_email_service import send_user_status_email, send_teacher_approval_email
 
 # Initialize Supabase admin client
 supabase_url = os.getenv("SUPABASE_URL")
@@ -55,7 +56,17 @@ async def toggle_user_status(request: ToggleUserStatusRequest):
         }).eq('id', request.user_id).execute()
 
         print(f"User status updated successfully: {update_response.data}")
-        
+
+        # Get admin name for email
+        admin_response = supabase_admin.table('profiles').select('full_name').eq('id', request.admin_id).single().execute()
+        admin_name = admin_response.data['full_name'] if admin_response.data else "Administrator"
+
+        # Send email notification
+        try:
+            await send_user_status_email(request.user_id, request.is_active, admin_name)
+        except Exception as email_error:
+            print(f"Failed to send status email: {email_error}")
+
         # Try to log the action (don't fail if this fails)
         try:
             log_response = supabase_admin.table('user_activity_logs').insert({
@@ -69,7 +80,7 @@ async def toggle_user_status(request: ToggleUserStatusRequest):
                     'user_name': current_user['full_name']
                 }
             }).execute()
-            
+
             if log_response.error:
                 print(f"Warning: Failed to log user action: {log_response.error}")
         except Exception as log_exception:
@@ -111,7 +122,17 @@ async def approve_teacher(request: ApproveTeacherRequest):
         }).eq('id', request.teacher_id).execute()
 
         print(f"Teacher approved successfully: {profile_response.data}")
-        
+
+        # Get admin name for email
+        admin_response = supabase_admin.table('profiles').select('full_name').eq('id', request.admin_id).single().execute()
+        admin_name = admin_response.data['full_name'] if admin_response.data else "Administrator"
+
+        # Send approval email notification
+        try:
+            await send_teacher_approval_email(request.teacher_id, True, admin_name)
+        except Exception as email_error:
+            print(f"Failed to send approval email: {email_error}")
+
         return {
             "success": True,
             "message": "Teacher approved successfully",

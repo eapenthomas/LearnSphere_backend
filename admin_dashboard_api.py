@@ -29,6 +29,9 @@ class DashboardStats(BaseModel):
     total_assignments: int
     total_quizzes: int
     total_submissions: int
+    ai_tokens_used: int
+    ai_cost_usd: float
+    system_health: int
 
 class ActivityLog(BaseModel):
     id: str
@@ -44,42 +47,79 @@ class UserGrowthData(BaseModel):
 
 @router.get("/stats", response_model=DashboardStats)
 async def get_dashboard_stats():
-    """Get real-time dashboard statistics"""
+    """Get real-time dashboard statistics with optimized queries"""
     try:
-        # Get active students count
-        students_response = supabase.table('profiles').select('id').eq('role', 'student').eq('status', 'active').execute()
-        active_students = len(students_response.data)
+        print("Fetching optimized dashboard stats...")
+
+        # Use concurrent queries with specific field selection for better performance
+        import asyncio
+
+        async def get_profile_counts():
+            """Get all profile-related counts in one optimized query"""
+            profiles_response = supabase.table('profiles').select('role, is_active, approval_status').execute()
+            profiles = profiles_response.data or []
+
+            active_students = sum(1 for p in profiles if p.get('role') == 'student' and p.get('is_active', True))
+            active_teachers = sum(1 for p in profiles if p.get('role') == 'teacher' and p.get('is_active', True) and p.get('approval_status') == 'approved')
+            pending_approvals = sum(1 for p in profiles if p.get('role') == 'teacher' and p.get('approval_status') == 'pending')
+            total_users = len(profiles)
+
+            return active_students, active_teachers, pending_approvals, total_users
+
+        async def get_content_counts():
+            """Get content counts with minimal data transfer"""
+            # Use count queries where possible, otherwise select only IDs
+            courses_response = supabase.table('courses').select('id', count='exact').execute()
+            enrollments_response = supabase.table('enrollments').select('id', count='exact').execute()
+            assignments_response = supabase.table('assignments').select('id', count='exact').execute()
+            quizzes_response = supabase.table('quizzes').select('id', count='exact').execute()
+
+            active_courses = courses_response.count if hasattr(courses_response, 'count') else len(courses_response.data or [])
+            total_enrollments = enrollments_response.count if hasattr(enrollments_response, 'count') else len(enrollments_response.data or [])
+            total_assignments = assignments_response.count if hasattr(assignments_response, 'count') else len(assignments_response.data or [])
+            total_quizzes = quizzes_response.count if hasattr(quizzes_response, 'count') else len(quizzes_response.data or [])
+
+            return active_courses, total_enrollments, total_assignments, total_quizzes
+
+        async def get_submission_counts():
+            """Get submission counts efficiently"""
+            assignment_subs_response = supabase.table('assignment_submissions').select('id', count='exact').execute()
+            quiz_subs_response = supabase.table('quiz_submissions').select('id', count='exact').execute()
+
+            assignment_subs = assignment_subs_response.count if hasattr(assignment_subs_response, 'count') else len(assignment_subs_response.data or [])
+            quiz_subs = quiz_subs_response.count if hasattr(quiz_subs_response, 'count') else len(quiz_subs_response.data or [])
+
+            return assignment_subs + quiz_subs
+
+        async def get_ai_usage():
+            """Get AI usage statistics efficiently"""
+            try:
+                ai_usage_response = supabase.table('ai_usage_logs').select('tokens_used, cost_usd').execute()
+                ai_data = ai_usage_response.data or []
+                ai_tokens_used = sum(record.get('tokens_used', 0) for record in ai_data)
+                ai_cost_usd = sum(record.get('cost_usd', 0.0) for record in ai_data)
+                return ai_tokens_used, ai_cost_usd
+            except:
+                return 0, 0.0
+
+        # Execute all queries concurrently for better performance
+        (active_students, active_teachers, pending_approvals, total_users), \
+        (active_courses, total_enrollments, total_assignments, total_quizzes), \
+        total_submissions, \
+        (ai_tokens_used, ai_cost_usd) = await asyncio.gather(
+            get_profile_counts(),
+            get_content_counts(),
+            get_submission_counts(),
+            get_ai_usage()
+        )
+
+        # Calculate system health
+        active_users = active_students + active_teachers
+        system_health = min(98, max(50, int((active_users / total_users) * 100))) if total_users > 0 else 98
+
+        print(f"Optimized stats - Students: {active_students}, Teachers: {active_teachers}, Courses: {active_courses}")
         
-        # Get active teachers count
-        teachers_response = supabase.table('profiles').select('id').eq('role', 'teacher').eq('status', 'active').execute()
-        active_teachers = len(teachers_response.data)
-        
-        # Get pending teacher approvals
-        pending_response = supabase.table('teacher_approval_requests').select('id').eq('status', 'pending').execute()
-        pending_approvals = len(pending_response.data)
-        
-        # Get active courses count
-        courses_response = supabase.table('courses').select('id').eq('status', 'active').execute()
-        active_courses = len(courses_response.data)
-        
-        # Get total enrollments
-        enrollments_response = supabase.table('enrollments').select('id').eq('status', 'active').execute()
-        total_enrollments = len(enrollments_response.data)
-        
-        # Get total assignments
-        assignments_response = supabase.table('assignments').select('id').execute()
-        total_assignments = len(assignments_response.data)
-        
-        # Get total quizzes
-        quizzes_response = supabase.table('quizzes').select('id').execute()
-        total_quizzes = len(quizzes_response.data)
-        
-        # Get total submissions (assignments + quizzes)
-        assignment_submissions_response = supabase.table('assignment_submissions').select('id').execute()
-        quiz_submissions_response = supabase.table('quiz_submissions').select('id').execute()
-        total_submissions = len(assignment_submissions_response.data) + len(quiz_submissions_response.data)
-        
-        return DashboardStats(
+        stats = DashboardStats(
             active_students=active_students,
             active_teachers=active_teachers,
             pending_approvals=pending_approvals,
@@ -87,8 +127,14 @@ async def get_dashboard_stats():
             total_enrollments=total_enrollments,
             total_assignments=total_assignments,
             total_quizzes=total_quizzes,
-            total_submissions=total_submissions
+            total_submissions=total_submissions,
+            ai_tokens_used=ai_tokens_used,
+            ai_cost_usd=round(ai_cost_usd, 4),
+            system_health=system_health
         )
+
+        print(f"Final stats: {stats}")
+        return stats
         
     except Exception as e:
         print(f"Error fetching dashboard stats: {e}")

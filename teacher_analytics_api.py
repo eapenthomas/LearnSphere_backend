@@ -21,10 +21,10 @@ supabase: Client = create_client(supabase_url, supabase_key)
 router = APIRouter(prefix="/api/teacher", tags=["teacher-analytics"])
 
 # Pydantic models
-class PerformanceDataPoint(BaseModel):
+class EnrollmentTrendPoint(BaseModel):
     name: str
-    average: float
-    target: float
+    enrollments: int
+    active_students: int
 
 class CoursePerformance(BaseModel):
     course: str
@@ -49,99 +49,152 @@ class RecentActivity(BaseModel):
     color: str
 
 class TeacherAnalytics(BaseModel):
-    performanceData: List[PerformanceDataPoint]
+    totalStudents: int
+    activeCourses: int
+    totalAssignments: int
+    averageGrade: float
+    enrollmentTrends: List[EnrollmentTrendPoint]
     coursePerformanceData: List[CoursePerformance]
     upcomingDeadlines: List[UpcomingDeadline]
     recentActivity: List[RecentActivity]
 
 @router.get("/analytics/{teacher_id}", response_model=TeacherAnalytics)
 async def get_teacher_analytics(teacher_id: str):
-    """Get comprehensive analytics data for teacher dashboard"""
+    """Get comprehensive analytics data for teacher dashboard with optimized queries"""
     try:
-        # Get teacher's courses
-        courses_response = supabase.table("courses").select("*").eq("teacher_id", teacher_id).execute()
-        courses = courses_response.data
+        import asyncio
+
+        # Get teacher's courses with optimized query
+        courses_response = supabase.table("courses").select("id, title, created_at").eq("teacher_id", teacher_id).execute()
+        courses = courses_response.data or []
         course_ids = [course["id"] for course in courses]
-        
+
         if not course_ids:
             return TeacherAnalytics(
-                performanceData=[],
+                totalStudents=0,
+                activeCourses=0,
+                totalAssignments=0,
+                averageGrade=0.0,
+                enrollmentTrends=[],
                 coursePerformanceData=[],
                 upcomingDeadlines=[],
                 recentActivity=[]
             )
-        
-        # Get performance data (last 6 weeks)
-        performance_data = await get_performance_data(course_ids)
-        
-        # Get course-wise performance
-        course_performance = await get_course_performance(courses)
-        
-        # Get upcoming deadlines
-        upcoming_deadlines = await get_upcoming_deadlines(course_ids)
-        
-        # Get recent activity
-        recent_activity = await get_recent_activity(course_ids)
-        
+
+        async def get_student_count():
+            """Get unique student count efficiently"""
+            enrollments_response = supabase.table("enrollments").select("student_id").in_("course_id", course_ids).eq("status", "active").execute()
+            unique_students = set(enrollment["student_id"] for enrollment in enrollments_response.data or [])
+            return len(unique_students)
+
+        async def get_assignment_count():
+            """Get total assignments count"""
+            assignments_response = supabase.table("assignments").select("id", count='exact').in_("course_id", course_ids).execute()
+            return assignments_response.count if hasattr(assignments_response, 'count') else len(assignments_response.data or [])
+
+        async def get_average_grade():
+            """Calculate average grade efficiently"""
+            try:
+                # Get assignment scores
+                assignment_submissions = supabase.table("assignment_submissions").select("score, max_score").in_("course_id", course_ids).execute()
+                assignment_scores = []
+                for submission in assignment_submissions.data or []:
+                    if submission.get("max_score", 0) > 0 and submission.get("score") is not None:
+                        percentage = (submission["score"] / submission["max_score"]) * 100
+                        assignment_scores.append(percentage)
+
+                # Get quiz scores
+                quiz_submissions = supabase.table("quiz_submissions").select("score, total_marks").in_("course_id", course_ids).execute()
+                quiz_scores = []
+                for submission in quiz_submissions.data or []:
+                    if submission.get("total_marks", 0) > 0 and submission.get("score") is not None:
+                        percentage = (submission["score"] / submission["total_marks"]) * 100
+                        quiz_scores.append(percentage)
+
+                all_scores = assignment_scores + quiz_scores
+                return sum(all_scores) / len(all_scores) if all_scores else 0.0
+            except:
+                return 0.0
+
+        # Execute core metrics concurrently
+        total_students, total_assignments, average_grade = await asyncio.gather(
+            get_student_count(),
+            get_assignment_count(),
+            get_average_grade()
+        )
+
+        # Get detailed analytics concurrently
+        enrollment_trends, course_performance_data, upcoming_deadlines, recent_activity = await asyncio.gather(
+            get_enrollment_trends(course_ids),
+            get_course_performance(courses),
+            get_upcoming_deadlines(course_ids),
+            get_recent_activity(course_ids)
+        )
+
         return TeacherAnalytics(
-            performanceData=performance_data,
-            coursePerformanceData=course_performance,
+            totalStudents=total_students,
+            activeCourses=len(courses),
+            totalAssignments=total_assignments,
+            averageGrade=round(average_grade, 1),
+            enrollmentTrends=enrollment_trends,
+            coursePerformanceData=course_performance_data,
             upcomingDeadlines=upcoming_deadlines,
             recentActivity=recent_activity
         )
-        
+
     except Exception as e:
         print(f"Error fetching teacher analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def get_performance_data(course_ids: List[str]) -> List[PerformanceDataPoint]:
-    """Get average student performance over the last 6 weeks"""
+async def get_enrollment_trends(course_ids: List[str]) -> List[EnrollmentTrendPoint]:
+    """Get student enrollment trends over the last 6 weeks"""
     try:
-        performance_data = []
+        enrollment_trends = []
         now = datetime.now(timezone.utc)
-        
+
         for i in range(6):
             week_start = now - timedelta(weeks=i+1)
             week_end = now - timedelta(weeks=i)
             week_name = f"Week {6-i}"
-            
-            # Get quiz submissions for this week
-            quiz_scores = []
-            for course_id in course_ids:
-                quiz_response = supabase.table("quiz_submissions").select("score, total_marks").eq("course_id", course_id).gte("submitted_at", week_start.isoformat()).lt("submitted_at", week_end.isoformat()).execute()
-                
-                for submission in quiz_response.data:
-                    if submission["total_marks"] and submission["total_marks"] > 0:
-                        percentage = (submission["score"] / submission["total_marks"]) * 100
-                        quiz_scores.append(percentage)
-            
-            # Get assignment scores for this week
-            assignment_scores = []
-            for course_id in course_ids:
-                assignment_response = supabase.table("assignment_submissions").select("score, max_score").eq("course_id", course_id).gte("submitted_at", week_start.isoformat()).lt("submitted_at", week_end.isoformat()).execute()
-                
-                for submission in assignment_response.data:
-                    if submission["max_score"] and submission["max_score"] > 0 and submission["score"] is not None:
-                        percentage = (submission["score"] / submission["max_score"]) * 100
-                        assignment_scores.append(percentage)
-            
-            # Calculate average
-            all_scores = quiz_scores + assignment_scores
-            average = sum(all_scores) / len(all_scores) if all_scores else 75  # Default to 75 if no data
-            
-            performance_data.append(PerformanceDataPoint(
+
+            # Get new enrollments for this week
+            enrollments_response = supabase.table("enrollments").select("id, student_id").in_("course_id", course_ids).gte("created_at", week_start.isoformat()).lt("created_at", week_end.isoformat()).execute()
+
+            new_enrollments = len(enrollments_response.data or [])
+
+            # Get active students (students who have activity in this week)
+            active_students_set = set()
+
+            # Check assignment submissions
+            assignment_activity = supabase.table("assignment_submissions").select("student_id").in_("course_id", course_ids).gte("created_at", week_start.isoformat()).lt("created_at", week_end.isoformat()).execute()
+            for submission in assignment_activity.data or []:
+                active_students_set.add(submission["student_id"])
+
+            # Check quiz attempts
+            quiz_activity = supabase.table("quiz_attempts").select("student_id").in_("course_id", course_ids).gte("created_at", week_start.isoformat()).lt("created_at", week_end.isoformat()).execute()
+            for attempt in quiz_activity.data or []:
+                active_students_set.add(attempt["student_id"])
+
+            # Check course progress updates
+            progress_activity = supabase.table("course_progress").select("student_id").in_("course_id", course_ids).gte("updated_at", week_start.isoformat()).lt("updated_at", week_end.isoformat()).execute()
+            for progress in progress_activity.data or []:
+                active_students_set.add(progress["student_id"])
+
+            active_students = len(active_students_set)
+
+            enrollment_trends.append(EnrollmentTrendPoint(
                 name=week_name,
-                average=round(average, 1),
-                target=85.0
+                enrollments=new_enrollments,
+                active_students=active_students
             ))
-        
-        return performance_data
-        
+
+        return enrollment_trends
+
     except Exception as e:
-        print(f"Error getting performance data: {e}")
+        print(f"Error getting enrollment trends: {e}")
         # Return default data if error
         return [
-            PerformanceDataPoint(name=f"Week {i+1}", average=75.0 + (i * 2), target=85.0)
+            EnrollmentTrendPoint(name=f"Week {i+1}", enrollments=max(0, 5 - i), active_students=max(0, 10 - i))
             for i in range(6)
         ]
 

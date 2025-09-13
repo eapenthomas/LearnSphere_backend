@@ -35,7 +35,7 @@ from course_progress_api import router as progress_router
 from quiz_generator_api import router as quiz_generator_router
 from activity_export_api import router as activity_export_router
 from user_management_api import router as user_management_router
-from smart_study_planner_api import router as study_planner_router
+
 
 app = FastAPI(title="LearnSphere API",
     description="E-learning platform API with authentication and user management",
@@ -73,7 +73,7 @@ app.include_router(progress_router)
 app.include_router(quiz_generator_router)
 app.include_router(activity_export_router)
 app.include_router(user_management_router)
-app.include_router(study_planner_router)
+
 
 @app.get("/")
 async def root():

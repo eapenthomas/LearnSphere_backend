@@ -325,6 +325,11 @@ async def get_teacher_courses(teacher_id: str):
     try:
         response = supabase.table('courses').select('*').eq('teacher_id', teacher_id).order('created_at', desc=True).execute()
 
+        # Debug: Print the first course to see what fields are available
+        if response.data:
+            print(f"Sample course data: {response.data[0]}")
+            print(f"Available fields: {list(response.data[0].keys())}")
+
         return {
             "success": True,
             "data": response.data

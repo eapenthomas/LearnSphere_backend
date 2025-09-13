@@ -313,28 +313,43 @@ async def get_teacher_profile(teacher_id: str):
 async def update_teacher_profile(teacher_id: str, profile_data: Dict[str, Any]):
     """Update teacher profile information."""
     try:
+        print(f"Updating teacher profile for {teacher_id} with data: {profile_data}")
+
         # Filter out fields that might not exist in the profiles table
-        allowed_fields = ['full_name', 'email', 'phone', 'bio', 'location']
-        filtered_data = {k: v for k, v in profile_data.items() if k in allowed_fields and v is not None}
+        allowed_fields = [
+            'full_name', 'email', 'phone', 'bio', 'location',
+            'department', 'specialization', 'experience_years',
+            'education', 'linkedin_url', 'website_url'
+        ]
+        filtered_data = {k: v for k, v in profile_data.items() if k in allowed_fields and v is not None and v != ''}
 
         if not filtered_data:
-            return {"message": "No valid fields to update"}
+            return {"success": False, "message": "No valid fields to update"}
+
+        # Add updated_at timestamp
+        filtered_data['updated_at'] = datetime.utcnow().isoformat()
 
         response = supabase.table('profiles').update(filtered_data).eq('id', teacher_id).execute()
+        print(f"Profile update response: {response}")
 
         if response.data:
-            return {"message": "Profile updated successfully", "updated_fields": list(filtered_data.keys())}
+            return {
+                "success": True,
+                "message": "Profile updated successfully",
+                "updated_fields": list(filtered_data.keys()),
+                "data": response.data[0]
+            }
         else:
             # Try to check if the profile exists
             check_response = supabase.table('profiles').select('id').eq('id', teacher_id).execute()
             if not check_response.data:
                 raise HTTPException(status_code=404, detail="Teacher profile not found")
             else:
-                return {"message": "Profile update completed (no changes detected)"}
+                return {"success": False, "message": "Profile update failed - no changes detected"}
 
     except Exception as e:
         print(f"Error updating teacher profile: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
 
 @router.get("/stats/{teacher_id}", response_model=Dict[str, Any])
 async def get_teacher_stats(teacher_id: str):

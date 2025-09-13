@@ -184,6 +184,169 @@ LearnSphere Team
         except Exception as e:
             print(f"❌ Failed to send OTP email to {to_email}: {str(e)}")
             return False
+
+    def send_event_notification(self, to_email: str, event_type: str, event_data: dict) -> bool:
+        """Send event-based notifications"""
+        try:
+            if not self.smtp_username or not self.smtp_password:
+                print("⚠️ Email configuration not available")
+                return False
+
+            # Create email content based on event type
+            subject, html_content = self._create_event_email_content(event_type, event_data)
+
+            if not subject or not html_content:
+                print(f"⚠️ Unknown event type: {event_type}")
+                return False
+
+            # Create message
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = f"{self.from_name} <{self.from_email}>"
+            msg['To'] = to_email
+
+            # Attach HTML content
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+
+            # Send email
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_username, self.smtp_password)
+                server.send_message(msg)
+
+            print(f"✅ Event notification sent successfully to {to_email}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to send event notification: {e}")
+            return False
+
+    def _create_event_email_content(self, event_type: str, event_data: dict) -> tuple:
+        """Create email content based on event type"""
+        base_style = """
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+            .container { background-color: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { font-size: 28px; font-weight: bold; color: #4f46e5; margin-bottom: 10px; }
+            .content { margin-bottom: 30px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0; }
+            .footer { text-align: center; color: #666; font-size: 14px; margin-top: 30px; }
+        </style>
+        """
+
+        if event_type == "assignment_submitted":
+            subject = f"New Assignment Submission - {event_data.get('assignment_title', 'Assignment')}"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">LearnSphere</div>
+                    <h2>New Assignment Submission</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('teacher_name', 'Teacher')},</p>
+                    <p>A new assignment has been submitted for your review:</p>
+                    <ul>
+                        <li><strong>Assignment:</strong> {event_data.get('assignment_title', 'N/A')}</li>
+                        <li><strong>Student:</strong> {event_data.get('student_name', 'N/A')}</li>
+                        <li><strong>Course:</strong> {event_data.get('course_title', 'N/A')}</li>
+                        <li><strong>Submitted:</strong> {event_data.get('submitted_at', 'N/A')}</li>
+                    </ul>
+                    <p>Please review the submission at your earliest convenience.</p>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "assignment_graded":
+            subject = f"Assignment Graded - {event_data.get('assignment_title', 'Assignment')}"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">LearnSphere</div>
+                    <h2>Assignment Graded</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('student_name', 'Student')},</p>
+                    <p>Your assignment has been graded:</p>
+                    <ul>
+                        <li><strong>Assignment:</strong> {event_data.get('assignment_title', 'N/A')}</li>
+                        <li><strong>Course:</strong> {event_data.get('course_title', 'N/A')}</li>
+                        <li><strong>Grade:</strong> {event_data.get('grade', 'N/A')}</li>
+                        <li><strong>Feedback:</strong> {event_data.get('feedback', 'No feedback provided')}</li>
+                    </ul>
+                    <p>Keep up the great work!</p>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "course_enrolled":
+            subject = f"Welcome to {event_data.get('course_title', 'Course')}"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">LearnSphere</div>
+                    <h2>Course Enrollment Confirmation</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('student_name', 'Student')},</p>
+                    <p>Congratulations! You have successfully enrolled in:</p>
+                    <ul>
+                        <li><strong>Course:</strong> {event_data.get('course_title', 'N/A')}</li>
+                        <li><strong>Instructor:</strong> {event_data.get('teacher_name', 'N/A')}</li>
+                        <li><strong>Enrolled:</strong> {event_data.get('enrolled_at', 'N/A')}</li>
+                    </ul>
+                    <p>Start your learning journey today!</p>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "deadline_reminder":
+            subject = f"Deadline Reminder - {event_data.get('item_title', 'Assignment/Quiz')}"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">LearnSphere</div>
+                    <h2>Deadline Reminder</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('student_name', 'Student')},</p>
+                    <p>This is a friendly reminder about an upcoming deadline:</p>
+                    <ul>
+                        <li><strong>Item:</strong> {event_data.get('item_title', 'N/A')}</li>
+                        <li><strong>Type:</strong> {event_data.get('item_type', 'N/A')}</li>
+                        <li><strong>Course:</strong> {event_data.get('course_title', 'N/A')}</li>
+                        <li><strong>Due Date:</strong> {event_data.get('due_date', 'N/A')}</li>
+                    </ul>
+                    <p>Don't miss the deadline! Complete your work on time.</p>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        else:
+            return None, None
+
+        return subject, html_content
     
     def is_configured(self) -> bool:
         """Check if email service is properly configured"""

@@ -148,8 +148,8 @@ async def get_questions(
         query = supabase.table('forum_questions').select('*')
 
         # Apply role-based access control
-        user_role = current_user.get('role', 'student')
-        user_id = current_user.get('user_id')
+        user_role = current_user.role
+        user_id = current_user.user_id
         
         if user_role == 'teacher':
             # Teachers can only see questions from their own courses
@@ -254,8 +254,8 @@ async def get_question_with_answers(question_id: str, current_user: dict = Depen
         question_data = question_response.data
         
         # Check access control - user must have access to this question's course
-        user_role = current_user.get('role', 'student')
-        user_id = current_user.get('user_id')
+        user_role = current_user.role
+        user_id = current_user.user_id
         question_course_id = question_data.get('course_id')
         
         if user_role == 'teacher':

@@ -1,541 +1,257 @@
-# 🎓 LearnSphere - Professional Learning Management System
+# 🎓 LearnSphere - Complete Learning Management System
 
 <div align="center">
-
-![LearnSphere Logo](https://img.shields.io/badge/LearnSphere-v2.0.0-blue?style=for-the-badge&logo=graduation-cap)
-
-**A comprehensive Learning Management System built with React, FastAPI, and Supabase**
-
-[![React](https://img.shields.io/badge/React-18.2.0-61DAFB?style=flat&logo=react&logoColor=white)](https://reactjs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com/)
-[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.3.0-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-
+  <img src="https://img.shields.io/badge/React-18.2.0-blue?style=for-the-badge&logo=react" alt="React Version"/>
+  <img src="https://img.shields.io/badge/FastAPI-Latest-green?style=for-the-badge&logo=fastapi" alt="FastAPI Version"/>
+  <img src="https://img.shields.io/badge/Supabase-Database-orange?style=for-the-badge&logo=supabase" alt="Supabase Database"/>
+  <img src="https://img.shields.io/badge/Python-3.8+-yellow?style=for-the-badge&logo=python" alt="Python Version"/>
 </div>
 
----
+## 🌟 Overview
 
-## 📋 Table of Contents
+LearnSphere is a comprehensive Learning Management System (LMS) built with modern web technologies. It provides a complete platform for educational institutions, teachers, and students to manage courses, assignments, quizzes, and learning materials.
 
-- [🚀 Quick Start](#-quick-start)
-- [🏗️ Project Structure](#️-project-structure)
-- [✨ Features & Functionalities](#-features--functionalities)
-- [🛠️ Technology Stack](#️-technology-stack)
-- [📊 Performance Metrics](#-performance-metrics)
-- [🔧 Configuration](#-configuration)
-- [📚 API Documentation](#-api-documentation)
-- [🧪 Testing & Analysis](#-testing--analysis)
+## ✨ Key Features
 
----
+### 🎯 Core Functionality
+
+- **User Management**: Student, Teacher, and Admin roles with secure authentication
+- **Course Management**: Create, manage, and organize courses with thumbnails and categories
+- **Assignment System**: Create assignments, track submissions, and grade student work
+- **Quiz System**: Interactive quizzes with AI-powered question generation
+- **Forum System**: Course-specific doubt forums with role-based access control
+- **File Management**: Upload and organize course materials with Supabase storage
+- **Progress Tracking**: Monitor student progress and course completion
+- **Notification System**: Real-time notifications for assignments, grades, and updates
+
+### 🤖 AI-Powered Features
+
+- **Notes Summarizer**: Upload PDFs and get AI-generated summaries
+- **Quiz Generator**: Automatically generate quiz questions from course materials
+- **Smart Recommendations**: AI-driven course and content suggestions
+
+### 💰 Payment Integration
+
+- **Razorpay Integration**: Secure payment processing for paid courses
+- **Subscription Management**: Handle course subscriptions and payments
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- **Node.js** (v16 or higher)
-- **Python** (v3.8 or higher)
-- **Git**
-- **Supabase Account**
-
-### Installation & Setup
-
-1. **Clone the Repository**
-
-   ```bash
-   git clone <repository-url>
-   cd LearnSphere
-   ```
-
-2. **Backend Setup**
-
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   cp env.example .env
-   # Edit .env with your Supabase credentials
-   ```
-
-3. **Frontend Setup**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-### Starting the Application
-
-#### Option 1: Professional Startup Script
+### Option 1: Professional Startup Script
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/LearnSphere.git
+cd LearnSphere
+
+# Start both backend and frontend with one command
 python start_learnsphere_professional.py
 ```
 
-_This will automatically start both backend and frontend servers, open the application in your browser, and show professional status output._
+### Option 2: Manual Startup
 
-#### Option 2: Manual Startup
-
-**Backend Server:**
+#### Backend Application
 
 ```bash
 cd backend
+pip install -r requirements.txt
 python main.py
 ```
 
-**Backend URL:** [http://localhost:8000](http://localhost:8000)
+Backend will be available at: http://localhost:8000
 
-**Frontend Application:**
+#### Frontend Application
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
 
-**Frontend URL:** [http://localhost:3000](http://localhost:3000)
+Frontend will be available at: http://localhost:3000
 
-### Quick Access Links
+## 🌐 Quick Access Links
+
+Once the application is running:
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 - **Admin Panel**: http://localhost:3000/admin
 
----
+## 📚 Documentation
 
-## 🏗️ Project Structure
+All documentation is organized in the `docs/` folder:
 
-```
-LearnSphere/
-├── 📁 backend/                          # FastAPI Backend
-│   ├── 📄 main.py                      # Main server file (optimized)
-│   ├── 📁 api/                         # API endpoint modules
-│   │   ├── 📄 auth_api.py              # Authentication endpoints
-│   │   ├── 📄 course_api.py            # Course management
-│   │   ├── 📄 enrollment_api.py        # Course enrollment
-│   │   ├── 📄 notifications_api.py     # Notification system
-│   │   ├── 📄 course_completion_api.py # Course completion tracking
-│   │   └── 📄 course_materials_enhanced.py # Multiple file upload
-│   ├── 📁 models/                      # Pydantic data models
-│   ├── 📁 utils/                       # Utility functions
-│   ├── 📁 middleware/                  # Custom middleware
-│   ├── 📄 requirements.txt             # Python dependencies
-│   └── 📄 .env                         # Environment variables
-├── 📁 frontend/                        # React Frontend
-│   ├── 📁 src/
-│   │   ├── 📁 components/              # Reusable UI components
-│   │   │   ├── 📄 DashboardLayout.jsx  # Student dashboard layout
-│   │   │   ├── 📄 NotificationBell.jsx # Notification component
-│   │   │   └── 📄 CourseThumbnail.jsx  # Course thumbnail display
-│   │   ├── 📁 pages/                   # Page components
-│   │   │   ├── 📁 student/             # Student-specific pages
-│   │   │   └── 📁 teacher/             # Teacher-specific pages
-│   │   ├── 📁 contexts/                # React contexts
-│   │   │   └── 📄 AuthContext.jsx      # Authentication context
-│   │   ├── 📁 utils/                   # Utility functions
-│   │   │   └── 📄 thumbnailUtils.jsx   # Thumbnail handling
-│   │   └── 📁 styles/                  # CSS and styling
-│   ├── 📄 package.json                 # Node dependencies
-│   └── 📄 public/                      # Static assets
-├── 📁 database/                        # Database schemas and migrations
-│   ├── 📄 courses_schema.sql           # Courses table with categories
-│   ├── 📄 notifications_schema.sql     # Notification system schema
-│   └── 📄 sample_courses.sql           # Sample course data
-├── 📁 docs/                            # Documentation
-│   ├── 📄 NOTIFICATION_SYSTEM_README.md
-│   ├── 📄 COURSE_MANAGEMENT_README.md
-│   └── 📄 AUTH_SYSTEM_README.md
-├── 📄 api_performance_report.py        # API performance testing
-├── 📄 supabase_performance_analyzer.py # Database performance analysis
-├── 📄 start_learnsphere.py             # Professional startup script
-└── 📄 README.md                        # This file
-```
+### 📖 Main Documentation
 
----
+- **[Main README](docs/MAIN_README.md)** - Detailed project overview and setup
+- **[Setup Guide](docs/SETUP_GUIDE.md)** - Complete development environment setup
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Production deployment to Render & Vercel
+- **[Testing Guide](docs/TESTING_GUIDE.md)** - Comprehensive testing with Selenium
 
-## ✨ Features & Functionalities
+### 🏗️ Architecture & Features
 
-### 🎓 **Course Management System**
+- **[Project Overview](docs/PROJECT_OVERVIEW.md)** - System architecture and vision
+- **[Technical Architecture](docs/TECHNICAL_ARCHITECTURE.md)** - Detailed technical specifications
+- **[Features Documentation](docs/FEATURES_DOCUMENTATION.md)** - Complete feature list
+- **[API Documentation](docs/API_DOCUMENTATION.md)** - API endpoints reference
 
-#### **Course Creation & Management**
+### 🔧 System Components
 
-- ✅ **Create courses** with detailed information (title, description, category)
-- ✅ **Course categories** (Programming, Data Science, Design, Business, etc.)
-- ✅ **Course thumbnails** with support for uploaded images and external URLs
-- ✅ **Course status management** (Active, Draft)
-- ✅ **Teacher course dashboard** with analytics
+- **[Authentication System](docs/AUTH_SYSTEM_README.md)** - User authentication and authorization
+- **[Course Management](docs/COURSE_MANAGEMENT_README.md)** - Course creation and management
+- **[Notification System](docs/NOTIFICATION_SYSTEM_README.md)** - Real-time notifications
+- **[Database Schema](docs/DATABASE_SCHEMA_README.md)** - Database structure and relationships
 
-#### **Course Enrollment System**
+### 🎨 UI/UX Components
 
-- ✅ **Student enrollment** in courses
-- ✅ **Enrollment tracking** and management
-- ✅ **Course progress tracking** for students
-- ✅ **Enrollment analytics** for teachers
+- **[Technical Architecture](docs/TECHNICAL_ARCHITECTURE.md)** - Frontend and backend architecture
 
-#### **Course Materials Management**
+### 📊 Analytics & Management
 
-- ✅ **Multiple file upload** (up to 10 files simultaneously)
-- ✅ **Supported file types**: PDF, DOC, PPT, images, videos, archives
-- ✅ **File size limit**: 50MB per file
-- ✅ **Automatic file organization** by course and timestamp
-- ✅ **Material description** and metadata
-- ✅ **File download** and preview functionality
+- **[Course Management](docs/COURSE_MANAGEMENT_README.md)** - Course creation and management features
 
-### 🔔 **Advanced Notification System**
+### 🗄️ Database & Storage
 
-#### **In-App Notifications**
+- **[Database Schema](docs/DATABASE_SCHEMA_README.md)** - Database setup and configuration
 
-- ✅ **31 different notification types** covering all system events
-- ✅ **Real-time notifications** with WebSocket support
-- ✅ **Notification preferences** and settings
-- ✅ **Notification history** and management
-- ✅ **Unread notification count** display
+### 🔐 Security & Payments
 
-#### **Email Notification System**
-
-- ✅ **Course completion emails** with beautiful HTML templates
-- ✅ **Assignment and quiz notifications**
-- ✅ **System announcements** and updates
-- ✅ **Email templates** with responsive design
-- ✅ **SMTP configuration** for reliable delivery
-
-### 🎨 **User Interface & Experience**
-
-#### **Responsive Design**
-
-- ✅ **Mobile-first design** with TailwindCSS
-- ✅ **Dark/Light theme** support
-- ✅ **Professional UI components** with consistent styling
-- ✅ **Smooth animations** with Framer Motion
-- ✅ **Accessible design** following WCAG guidelines
-
-#### **Dashboard Systems**
-
-- ✅ **Student Dashboard** with course overview and progress
-- ✅ **Teacher Dashboard** with course management and analytics
-- ✅ **Admin Dashboard** with system management tools
-- ✅ **Role-based access control** for different user types
-
-#### **Course Discovery & Filtering**
-
-- ✅ **All Courses page** with comprehensive course listing
-- ✅ **Category filtering** with dynamic category extraction
-- ✅ **Search functionality** across courses, teachers, and content
-- ✅ **Course sorting** by date, popularity, rating
-- ✅ **Thumbnail display** with proper fallbacks
-
-### 🔐 **Authentication & Security**
-
-#### **User Authentication**
-
-- ✅ **JWT-based authentication** with refresh tokens
-- ✅ **Role-based access control** (Student, Teacher, Admin)
-- ✅ **Secure password handling** with hashing
-- ✅ **Session management** with auto-refresh
-- ✅ **Profile management** with avatar uploads
-
-#### **Security Features**
-
-- ✅ **Row Level Security (RLS)** in Supabase
-- ✅ **API endpoint protection** with middleware
-- ✅ **File upload validation** and security
-- ✅ **CORS configuration** for cross-origin requests
-- ✅ **Input validation** with Pydantic models
-
-### 📊 **Analytics & Reporting**
-
-#### **Teacher Analytics**
-
-- ✅ **Course performance metrics**
-- ✅ **Student enrollment statistics**
-- ✅ **Assignment and quiz analytics**
-- ✅ **Revenue tracking** (for paid courses)
-- ✅ **Course completion rates**
-
-#### **System Analytics**
-
-- ✅ **API performance monitoring**
-- ✅ **Database query optimization**
-- ✅ **User activity tracking**
-- ✅ **System health monitoring**
-
-### 🧪 **Assessment & Evaluation**
-
-#### **Assignment System**
-
-- ✅ **Create assignments** with detailed instructions
-- ✅ **File submission** support
-- ✅ **Grading system** with feedback
-- ✅ **Due date management** with notifications
-- ✅ **Submission tracking** and analytics
-
-#### **Quiz System**
-
-- ✅ **Create quizzes** with multiple question types
-- ✅ **Auto-grading** for objective questions
-- ✅ **Quiz analytics** and performance tracking
-- ✅ **Time-limited quizzes** with countdown
-- ✅ **Question bank** management
-
-### 💰 **Payment & Monetization**
-
-#### **Payment Integration**
-
-- ✅ **Razorpay integration** for Indian payments
-- ✅ **Course pricing** and payment processing
-- ✅ **Revenue tracking** for teachers
-- ✅ **Payment history** and receipts
-- ✅ **Refund management**
-
-### 🔧 **System Features**
-
-#### **Performance Optimization**
-
-- ✅ **Lazy loading** for heavy modules
-- ✅ **Database connection pooling**
-- ✅ **Query optimization** with proper indexing
-- ✅ **Caching layer** for frequent queries
-- ✅ **Fast server startup** (3-5 seconds)
-
-#### **File Management**
-
-- ✅ **Supabase Storage** integration
-- ✅ **File upload** with progress tracking
-- ✅ **Image optimization** and resizing
-- ✅ **Secure file serving** with access control
-- ✅ **File cleanup** and maintenance
-
-#### **Developer Experience**
-
-- ✅ **Comprehensive API documentation** with Swagger
-- ✅ **Performance testing tools**
-- ✅ **Database migration scripts**
-- ✅ **Environment configuration** management
-- ✅ **Professional startup scripts**
-
----
+- **[Authentication System](docs/AUTH_SYSTEM_README.md)** - User authentication and security
 
 ## 🛠️ Technology Stack
 
-### **Frontend Technologies**
+### Frontend
 
-- **React 18.2.0** - Modern UI framework with hooks
-- **TailwindCSS 3.3.0** - Utility-first CSS framework
-- **Framer Motion** - Smooth animations and transitions
+- **React 18** - Modern UI library
+- **Vite** - Fast build tool and dev server
 - **React Router** - Client-side routing
-- **Axios** - HTTP client for API calls
-- **React Hot Toast** - Beautiful notifications
-- **Lucide React** - Consistent icon library
+- **Framer Motion** - Smooth animations
+- **Axios** - HTTP client
+- **Tailwind CSS** - Utility-first CSS framework
+- **Lucide React** - Beautiful icons
 
-### **Backend Technologies**
+### Backend
 
-- **FastAPI 0.104.1** - Modern, fast web framework
+- **FastAPI** - Modern Python web framework
 - **Python 3.8+** - Programming language
-- **Pydantic** - Data validation and serialization
-- **Uvicorn** - ASGI server for production
-- **SQLAlchemy** - Database ORM (optional)
-- **SMTP** - Email delivery system
+- **Pydantic** - Data validation
+- **JWT** - Authentication tokens
+- **SQLAlchemy** - Database ORM
+- **Uvicorn** - ASGI server
 
-### **Database & Storage**
+### Database & Storage
 
-- **Supabase** - Backend-as-a-Service platform
-- **PostgreSQL** - Primary relational database
-- **Supabase Storage** - File storage and CDN
-- **Row Level Security** - Database-level security
-- **Real-time subscriptions** - Live data updates
+- **Supabase** - PostgreSQL database and real-time features
+- **PostgreSQL** - Primary database
+- **Supabase Storage** - File storage solution
 
-### **Development Tools**
+### AI & External Services
 
-- **ESLint** - Code linting and formatting
-- **Prettier** - Code formatting
-- **Jest** - Testing framework
-- **Git** - Version control
-- **Docker** - Containerization (optional)
+- **OpenAI API** - AI-powered features
+- **DeepSeek API** - Alternative AI provider
+- **SMTP** - Email notifications
+- **Razorpay** - Payment processing
 
----
+## 🏃‍♂️ Getting Started
 
-## 📊 Performance Metrics
+1. **Clone the Repository**
 
-| Feature             | Performance                   | Status               |
-| ------------------- | ----------------------------- | -------------------- |
-| Server Startup      | ~3-5 seconds                  | ✅ Optimized         |
-| API Response Time   | ~2-3 seconds                  | ⚠️ Network dependent |
-| File Upload         | Up to 10 files simultaneously | ✅ Excellent         |
-| Database Queries    | Optimized with caching        | ✅ Good              |
-| Frontend Load Time  | ~1-2 seconds                  | ✅ Fast              |
-| Notification System | Real-time                     | ✅ Excellent         |
-| Concurrent Users    | 100+ supported                | ✅ Scalable          |
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-**Backend (.env file):**
-
-```env
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# Email Configuration
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_app_password
-FROM_EMAIL=your_email@gmail.com
-FROM_NAME=LearnSphere
-
-# JWT Configuration
-JWT_SECRET_KEY=your_jwt_secret_key
-JWT_ALGORITHM=HS256
-JWT_EXPIRATION_HOURS=24
-
-# Payment Configuration (Optional)
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
-```
-
-### Database Setup
-
-1. **Create Supabase Project**
-2. **Run Database Migrations:**
-   ```sql
-   -- Run in Supabase SQL Editor
-   -- Execute: database/courses_schema.sql
-   -- Execute: database/notifications_schema.sql
-   -- Execute: database/sample_courses.sql (optional)
+   ```bash
+   git clone https://github.com/your-username/LearnSphere.git
+   cd LearnSphere
    ```
 
----
+2. **Setup Environment**
 
-## 📚 API Documentation
+   - Copy `backend/.env.example` to `backend/.env`
+   - Copy `frontend/.env.example` to `frontend/.env`
+   - Configure your environment variables
 
-### **Core Endpoints**
+3. **Install Dependencies**
 
-- `GET /` - Root endpoint
-- `GET /health` - Health check
-- `GET /docs` - Interactive API documentation
+   ```bash
+   # Backend dependencies
+   cd backend && pip install -r requirements.txt
 
-### **Authentication Endpoints**
+   # Frontend dependencies
+   cd frontend && npm install
+   ```
 
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/refresh` - Refresh JWT token
-- `POST /api/auth/logout` - User logout
+4. **Start the Application**
 
-### **Course Management**
+   ```bash
+   # Use the professional startup script
+   python start_learnsphere_professional.py
+   ```
 
-- `GET /api/courses/` - Get all courses
-- `POST /api/courses/` - Create new course
-- `GET /api/courses/categories` - Get course categories
-- `GET /api/courses/{id}` - Get specific course
-- `PUT /api/courses/{id}` - Update course
-- `DELETE /api/courses/{id}` - Delete course
+5. **Access the Application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
 
-### **Course Materials**
+## 🧪 Testing
 
-- `POST /api/course-materials/upload-multiple` - Upload multiple files
-- `GET /api/course-materials/course/{id}` - Get course materials
-- `DELETE /api/course-materials/{id}` - Delete material
-- `PUT /api/course-materials/{id}` - Update material
-
-### **Notifications**
-
-- `GET /api/notifications/` - Get user notifications
-- `GET /api/notifications/types` - Get notification types
-- `POST /api/notifications/mark-read/{id}` - Mark as read
-- `POST /api/notifications/mark-all-read` - Mark all as read
-
-### **Course Completion**
-
-- `POST /api/course-completion/mark-complete` - Mark course complete
-- `GET /api/course-completion/my-completions` - Get user completions
-- `GET /api/course-completion/stats` - Get completion statistics
-
----
-
-## 🧪 Testing & Analysis
-
-### **Performance Testing**
+Comprehensive testing guide available in [Testing Guide](docs/TESTING_GUIDE.md):
 
 ```bash
-# Generate API performance report
-python api_performance_report.py
+# Run automated tests
+python run_tests.py
 
-# Analyze Supabase database performance
-python supabase_performance_analyzer.py
-
-# Test email system
-python test_email_specific.py
+# Run specific test suites
+python -c "from test_setup import LearnSphereTester; t = LearnSphereTester(); t.setup_driver(); t.test_course_creation(); t.teardown_driver()"
 ```
-
-### **Available Test Reports**
-
-- **API Performance Report** - Comprehensive endpoint testing
-- **Database Performance Analysis** - Supabase query optimization
-- **Email System Test** - SMTP configuration validation
-- **Concurrent Request Testing** - Load testing capabilities
-
----
 
 ## 🚀 Deployment
 
-### **Production Deployment**
+Complete deployment guide available in [Deployment Guide](docs/DEPLOYMENT_GUIDE.md):
 
-#### Quick Deployment Setup
-
-```bash
-# Prepare deployment configuration
-python deploy_to_production.py
-```
-
-#### Manual Deployment Steps
-
-1. **Backend Deployment (Render):**
-
-   - Deploy to [Render.com](https://render.com)
-   - Use `backend/render.yaml` configuration
-   - Set environment variables in Render dashboard
-
-2. **Frontend Deployment (Vercel):**
-
-   - Deploy to [Vercel.com](https://vercel.com)
-   - Use `frontend/vercel.json` configuration
-   - Set environment variables in Vercel dashboard
-
-3. **Database Setup:**
-   - Use Supabase production instance
-   - Configure RLS policies
-   - Set up monitoring
-
-**See `DEPLOYMENT_INSTRUCTIONS.md` for detailed deployment guide.**
-
----
+- **Backend**: Deploy to Render
+- **Frontend**: Deploy to Vercel
+- **Database**: Configure Supabase production
+- **Custom Domains**: Setup production domains
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Add tests for new features
 5. Submit a pull request
 
----
+## 📄 License
 
-## 📞 Support
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-- **API Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Frontend Application:** [http://localhost:3000](http://localhost:3000)
-- **Performance Reports:** Run analysis scripts
-- **Issues:** Create GitHub issues for bugs or features
+## 🆘 Support
+
+- **Documentation**: Check the `docs/` folder for detailed guides
+- **Issues**: Report bugs and feature requests via GitHub Issues
+- **Discussions**: Join community discussions for help and ideas
+
+## 🎯 Roadmap
+
+- [ ] Mobile app development
+- [ ] Advanced analytics dashboard
+- [ ] Video conferencing integration
+- [ ] Gamification features
+- [ ] Multi-language support
+- [ ] Advanced AI tutoring
+
+## 🙏 Acknowledgments
+
+- Built with modern web technologies
+- Inspired by the need for accessible education
+- Community-driven development approach
 
 ---
 
 <div align="center">
-
-**🎉 LearnSphere - Empowering Education Through Technology**
-
-_Built with ❤️ for educators and learners worldwide_
-
-**Version 2.0.0** | **Last Updated:** December 2024
-
+  <p>Made with ❤️ for the education community</p>
+  <p>
+    <a href="docs/MAIN_README.md">📖 Full Documentation</a> •
+    <a href="docs/DEPLOYMENT_GUIDE.md">🚀 Deployment Guide</a> •
+    <a href="docs/TESTING_GUIDE.md">🧪 Testing Guide</a>
+  </p>
 </div>

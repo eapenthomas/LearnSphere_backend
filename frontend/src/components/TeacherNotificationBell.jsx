@@ -25,7 +25,7 @@ const TeacherNotificationBell = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('learnsphere_access_token') || localStorage.getItem('learnsphere_token');
       const response = await fetch('http://localhost:8000/api/notifications/?limit=15', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -46,7 +46,7 @@ const TeacherNotificationBell = () => {
 
   const fetchNotificationCount = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('learnsphere_access_token') || localStorage.getItem('learnsphere_token');
       const response = await fetch('http://localhost:8000/api/notifications/count', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -66,7 +66,7 @@ const TeacherNotificationBell = () => {
   const markAsRead = async (notificationId) => {
     try {
       setMarkingRead(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('learnsphere_access_token') || localStorage.getItem('learnsphere_token');
       const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
@@ -96,7 +96,7 @@ const TeacherNotificationBell = () => {
   const markAllAsRead = async () => {
     try {
       setMarkingRead(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('learnsphere_access_token') || localStorage.getItem('learnsphere_token');
       const response = await fetch('http://localhost:8000/api/notifications/mark-all-read', {
         method: 'PUT',
         headers: {
@@ -120,7 +120,7 @@ const TeacherNotificationBell = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('learnsphere_access_token') || localStorage.getItem('learnsphere_token');
       const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {

@@ -56,7 +56,11 @@ const StudentForum = () => {
       if (filterCourse) params.append('course_id', filterCourse);
       if (filterResolved !== 'all') params.append('resolved', filterResolved === 'resolved');
       
-      const response = await fetch(`http://localhost:8000/api/forum/questions?${params}`);
+      const response = await fetch(`http://localhost:8000/api/forum/questions?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${user?.accessToken || ''}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setQuestions(data);
@@ -91,7 +95,11 @@ const StudentForum = () => {
 
   const fetchQuestionDetails = async (questionId) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/forum/questions/${questionId}`);
+      const response = await fetch(`http://localhost:8000/api/forum/questions/${questionId}`, {
+        headers: {
+          'Authorization': `Bearer ${user?.accessToken || ''}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setSelectedQuestion(data);

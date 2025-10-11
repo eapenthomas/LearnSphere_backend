@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from auth_middleware import get_current_user
 
 load_dotenv()
 
@@ -129,9 +130,10 @@ async def get_questions(
     student_id: Optional[str] = Query(None),
     resolved: Optional[bool] = Query(None),
     limit: int = Query(20, le=100),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user)
 ):
-    """Get forum questions with filters"""
+    """Get forum questions with filters and role-based access control"""
     try:
         # Check if forum tables exist
         try:
@@ -145,7 +147,34 @@ async def get_questions(
 
         query = supabase.table('forum_questions').select('*')
 
-        # Apply filters
+        # Apply role-based access control
+        user_role = current_user.get('role', 'student')
+        user_id = current_user.get('user_id')
+        
+        if user_role == 'teacher':
+            # Teachers can only see questions from their own courses
+            teacher_courses_response = supabase.table('courses').select('id').eq('teacher_id', user_id).execute()
+            teacher_course_ids = [course['id'] for course in teacher_courses_response.data]
+            
+            if not teacher_course_ids:
+                # Teacher has no courses, return empty list
+                return []
+            
+            # Filter questions by teacher's courses
+            query = query.in_('course_id', teacher_course_ids)
+        elif user_role == 'student':
+            # Students can see questions from courses they're enrolled in
+            student_enrollments_response = supabase.table('enrollments').select('course_id').eq('student_id', user_id).eq('status', 'active').execute()
+            student_course_ids = [enrollment['course_id'] for enrollment in student_enrollments_response.data]
+            
+            if not student_course_ids:
+                # Student is not enrolled in any courses, return empty list
+                return []
+            
+            # Filter questions by student's enrolled courses
+            query = query.in_('course_id', student_course_ids)
+        
+        # Apply additional filters
         if course_id:
             query = query.eq('course_id', course_id)
         if student_id:
@@ -213,7 +242,7 @@ async def get_questions(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/questions/{question_id}", response_model=QuestionWithAnswers)
-async def get_question_with_answers(question_id: str):
+async def get_question_with_answers(question_id: str, current_user: dict = Depends(get_current_user)):
     """Get a specific question with all its answers"""
     try:
         # Get question details
@@ -223,6 +252,26 @@ async def get_question_with_answers(question_id: str):
             raise HTTPException(status_code=404, detail="Question not found")
         
         question_data = question_response.data
+        
+        # Check access control - user must have access to this question's course
+        user_role = current_user.get('role', 'student')
+        user_id = current_user.get('user_id')
+        question_course_id = question_data.get('course_id')
+        
+        if user_role == 'teacher':
+            # Teachers can only access questions from their own courses
+            teacher_courses_response = supabase.table('courses').select('id').eq('teacher_id', user_id).execute()
+            teacher_course_ids = [course['id'] for course in teacher_courses_response.data]
+            
+            if question_course_id not in teacher_course_ids:
+                raise HTTPException(status_code=403, detail="Access denied: You can only view questions from your own courses")
+        elif user_role == 'student':
+            # Students can only access questions from courses they're enrolled in
+            student_enrollments_response = supabase.table('enrollments').select('course_id').eq('student_id', user_id).eq('status', 'active').execute()
+            student_course_ids = [enrollment['course_id'] for enrollment in student_enrollments_response.data]
+            
+            if question_course_id not in student_course_ids:
+                raise HTTPException(status_code=403, detail="Access denied: You can only view questions from courses you're enrolled in")
         
         # Get answers
         answers_response = supabase.table('forum_answers').select('*').eq('question_id', question_id).order('created_at').execute()

@@ -63,29 +63,32 @@ async def get_student_enrollments(student_id: str):
         # Verify student exists
         await get_current_user(student_id)
         
-        # Get enrollments with course and teacher details
-        response = supabase.table("enrollments").select("""
-            *,
-            courses!enrollments_course_id_fkey (
-                title,
-                teacher_id,
-                profiles!courses_teacher_id_fkey (
-                    full_name
-                )
-            )
-        """).eq("student_id", student_id).eq("status", "active").execute()
+        # Get enrollments first
+        enrollments_response = supabase.table("enrollments").select("*").eq("student_id", student_id).eq("status", "active").execute()
         
         enrollments = []
-        for enrollment in response.data:
-            course = enrollment.get("courses", {})
-            teacher = course.get("profiles", {}) if course else {}
+        for enrollment in enrollments_response.data:
+            # Get course details
+            course_response = supabase.table("courses").select("title, teacher_id").eq("id", enrollment["course_id"]).single().execute()
+            course_title = "Unknown Course"
+            teacher_name = "Unknown Teacher"
+            
+            if course_response.data:
+                course_title = course_response.data.get("title", "Unknown Course")
+                teacher_id = course_response.data.get("teacher_id")
+                
+                # Get teacher details
+                if teacher_id:
+                    teacher_response = supabase.table("profiles").select("full_name").eq("id", teacher_id).single().execute()
+                    if teacher_response.data:
+                        teacher_name = teacher_response.data.get("full_name", "Unknown Teacher")
             
             enrollments.append(EnrollmentResponse(
                 id=enrollment["id"],
                 student_id=enrollment["student_id"],
                 course_id=enrollment["course_id"],
-                course_title=course.get("title", "Unknown Course"),
-                teacher_name=teacher.get("full_name", "Unknown Teacher"),
+                course_title=course_title,
+                teacher_name=teacher_name,
                 status=enrollment["status"],
                 progress=enrollment.get("progress", 0),
                 enrolled_at=enrollment.get("enrolled_at", enrollment.get("created_at")),

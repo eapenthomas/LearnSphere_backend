@@ -1,0 +1,128 @@
+{
+  "timestamp": "2025-10-11T12:40:12.266927",
+  "supabase_url": "https://ffspaottcgyalpagbxvx.supabase.co",
+  "total_queries_tested": 9,
+  "successful_queries": 9,
+  "overall_avg_response_time_ms": 387.1046529875861,
+  "performance_rating": "\u26a0\ufe0f Fair",
+  "query_results": {
+    "simple_select": {
+      "query_name": "Simple Select (profiles)",
+      "avg_time_ms": 575.1068592071533,
+      "min_time_ms": 89.38884735107422,
+      "max_time_ms": 1457.9248428344727,
+      "median_time_ms": 181.53691291809082,
+      "std_dev_ms": 621.2501331176402,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "courses_with_joins": {
+      "query_name": "Courses with Joins",
+      "avg_time_ms": 120.8761215209961,
+      "min_time_ms": 80.52825927734375,
+      "max_time_ms": 218.1069850921631,
+      "median_time_ms": 88.55628967285156,
+      "std_dev_ms": 58.70369205147865,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "complex_filtered_query": {
+      "query_name": "Complex Filtered Query",
+      "avg_time_ms": 125.25439262390137,
+      "min_time_ms": 73.44675064086914,
+      "max_time_ms": 241.1489486694336,
+      "median_time_ms": 97.9464054107666,
+      "std_dev_ms": 69.86753597655168,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "count_query": {
+      "query_name": "Count Query",
+      "avg_time_ms": 129.1511058807373,
+      "min_time_ms": 64.5754337310791,
+      "max_time_ms": 292.1788692474365,
+      "median_time_ms": 76.07388496398926,
+      "std_dev_ms": 97.36647540139843,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "insert_test": {
+      "query_name": "Insert Operation",
+      "avg_time_ms": 1576.9280910491943,
+      "min_time_ms": 373.86631965637207,
+      "max_time_ms": 5764.139413833618,
+      "median_time_ms": 579.9286365509033,
+      "std_dev_ms": 2346.7343396634437,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "notification_types": {
+      "query_name": "Notification Types (Static)",
+      "avg_time_ms": 0.0,
+      "min_time_ms": 0.0,
+      "max_time_ms": 0.0,
+      "median_time_ms": 0.0,
+      "std_dev_ms": 0.0,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "user_notifications": {
+      "query_name": "User Notifications",
+      "avg_time_ms": 321.95634841918945,
+      "min_time_ms": 75.36745071411133,
+      "max_time_ms": 516.4945125579834,
+      "median_time_ms": 385.1277828216553,
+      "std_dev_ms": 183.75353768269198,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "course_materials": {
+      "query_name": "Course Materials with Joins",
+      "avg_time_ms": 92.79751777648926,
+      "min_time_ms": 64.64076042175293,
+      "max_time_ms": 185.40215492248535,
+      "median_time_ms": 70.79887390136719,
+      "std_dev_ms": 52.067092594262,
+      "success_rate": 100.0,
+      "errors": [],
+      "sample_count": 5
+    },
+    "concurrent_requests": {
+      "query_name": "Concurrent Simple Queries",
+      "total_requests": 20,
+      "successful_requests": 20,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "avg_time_ms": 541.871440410614,
+      "min_time_ms": 154.87360954284668,
+      "max_time_ms": 830.8980464935303,
+      "median_time_ms": 556.6613674163818
+    }
+  },
+  "optimization_recommendations": [
+    "\ud83d\udd27 Optimize slow queries with proper indexing",
+    "\ud83d\udcca Consider denormalizing frequently joined data",
+    "\ud83d\udcbe Implement query result caching",
+    "\ud83d\udd17 Optimize JOIN queries with proper foreign key indexes",
+    "\ud83d\udcc8 Consider using views for complex joins",
+    "\ud83d\udccb Add database indexes for frequently queried columns",
+    "\ud83c\udfaf Use SELECT specific columns instead of SELECT *",
+    "\u23f0 Implement query timeout handling",
+    "\ud83d\udcca Monitor query performance with Supabase dashboard",
+    "\ud83d\udd0d Use EXPLAIN ANALYZE for slow queries",
+    "\ud83d\udcbe Consider Redis caching for frequently accessed data"
+  ],
+  "summary": {
+    "fastest_query": "Notification Types (Static)",
+    "slowest_query": "Insert Operation",
+    "queries_over_500ms": 3,
+    "queries_under_100ms": 2
+  }
+}

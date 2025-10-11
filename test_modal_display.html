@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal Display Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .test-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 50;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            width: 100%;
+            max-width: 600px;
+            max-height: 95vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #f3f4f6;
+            flex-shrink: 0;
+            background: white;
+        }
+        .modal-body {
+            padding: 24px 24px 8px 24px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+        }
+        .modal-footer {
+            padding: 24px;
+            border-top: 1px solid #f3f4f6;
+            flex-shrink: 0;
+            background: white;
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+        }
+        .form-field {
+            margin-bottom: 24px;
+        }
+        .form-field label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #000000;
+        }
+        .form-field input, .form-field textarea, .form-field select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            color: #000000;
+            background-color: #ffffff;
+        }
+        .form-field textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background: linear-gradient(to right, #4f46e5, #3b82f6);
+            color: white;
+        }
+        .btn-secondary {
+            background: transparent;
+            color: #6b7280;
+        }
+        .radio-group {
+            display: flex;
+            gap: 24px;
+            margin-top: 12px;
+        }
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .test-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-content">
+        <h1>Modal Display Test</h1>
+        <p>This test shows how the Create New Course modal should display with all fields visible.</p>
+        <button onclick="showModal()" class="btn btn-primary">Show Test Modal</button>
+    </div>
+
+    <div id="testModal" class="test-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600; color: #111827;">Create New Course</h2>
+                <button onclick="hideModal()" style="position: absolute; top: 24px; right: 24px; background: none; border: none; cursor: pointer; padding: 8px;">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-field">
+                    <label>Course Title *</label>
+                    <input type="text" value="AWS" placeholder="Enter course title">
+                </div>
+                
+                <div class="form-field">
+                    <label>Course Description</label>
+                    <textarea placeholder="Enter course description">Introduction to Amazon Web Services. Learn EC2, S3, Lambda, and other core services. Prepare for AWS certification exams.</textarea>
+                </div>
+                
+                <div class="form-field">
+                    <label>Course Thumbnail</label>
+                    <div style="border: 2px dashed #d1d5db; border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 12px;">
+                        <div style="width: 120px; height: 80px; background: #374151; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; border-radius: 8px; font-weight: 600;">
+                            Cloud Practitioner
+                        </div>
+                        <p style="margin: 0; color: #6b7280; font-size: 14px;">Change thumbnail</p>
+                        <p style="margin: 4px 0 0 0; color: #9ca3af; font-size: 12px;">PNG, JPG up to 5MB</p>
+                    </div>
+                </div>
+                
+                <div class="form-field">
+                    <label>Course Type</label>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" name="courseType" value="free" checked>
+                            <span>Free Course</span>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" name="courseType" value="paid">
+                            <span>Paid Course</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-field">
+                    <label>Category</label>
+                    <select>
+                        <option value="">Select category</option>
+                        <option value="programming">Programming</option>
+                        <option value="cloud">Cloud Computing</option>
+                        <option value="design">Design</option>
+                        <option value="business">Business</option>
+                    </select>
+                </div>
+                
+                <div class="form-field">
+                    <label>Difficulty Level</label>
+                    <select>
+                        <option value="">Select difficulty</option>
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+                
+                <div class="form-field">
+                    <label>Duration (weeks)</label>
+                    <input type="number" value="8" min="1" max="52">
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button onclick="hideModal()" class="btn btn-secondary">Cancel</button>
+                <button class="btn btn-primary">Create Course</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showModal() {
+            document.getElementById('testModal').style.display = 'flex';
+        }
+        
+        function hideModal() {
+            document.getElementById('testModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('testModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideModal();
+            }
+        });
+    </script>
+</body>
+</html>

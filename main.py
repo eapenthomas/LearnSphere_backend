@@ -177,31 +177,9 @@ async def simple_login(request: dict):
         email = request.get("email", "")
         password = request.get("password", "")
         
-        if email == "admin@learnsphere.com" and password == "admin123":
-            return {
-                "success": True,
-                "message": "Login successful",
-                "user": {
-                    "id": "admin-001",
-                    "email": "admin@learnsphere.com",
-                    "role": "admin",
-                    "full_name": "System Administrator"
-                },
-                "token": "test-admin-token"
-            }
-        elif email == "eapenthomas2026@mca.ajce.in" and password == "password123":
-            return {
-                "success": True,
-                "message": "Login successful",
-                "user": {
-                    "id": "admin-002",
-                    "email": "eapenthomas2026@mca.ajce.in",
-                    "role": "admin",
-                    "full_name": "Eapen Thomas"
-                },
-                "token": "test-eapen-admin-token"
-            }
-        elif email == "teacher@learnsphere.com" and password == "teacher123":
+        # Only eapentkadamapuzha@gmail.com should be admin - this is handled by Supabase auth
+        # Test endpoints are for development only
+        if email == "teacher@learnsphere.com" and password == "teacher123":
             return {
                 "success": True,
                 "message": "Login successful",
@@ -263,9 +241,8 @@ async def check_email(request: dict):
     try:
         email = request.get("email", "")
         
-        # Test emails that exist
+        # Test emails that exist (removed admin@learnsphere.com - only eapentkadamapuzha@gmail.com is admin)
         existing_emails = [
-            "admin@learnsphere.com",
             "teacher@learnsphere.com", 
             "student@learnsphere.com",
             "john@example.com",

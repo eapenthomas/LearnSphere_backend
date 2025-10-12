@@ -26,12 +26,36 @@ def get_allowed_origins():
         "https://learn-sphere-frontend-eapenthomas-projects.vercel.app",
         "https://learn-sphere-frontend-git-main-eapenthomas-projects.vercel.app",
         "https://learn-sphere-frontend-grfp9yq65-eapenthomas-projects.vercel.app",
+        # Additional Vercel deployment URLs
+        "https://learn-sphere-frontend-dmoxpjl0j-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-7s6ls9abp-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-g6eygj25p-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-lfqf7rd9c-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-11kf9ewnk-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-r1muyltzx-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-2yol04ltn-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-fu24n4rcz-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-2sye06jqt-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-qjtto8rdm-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-apwka5ug5-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-gj1pxifus-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-rl6biozeq-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-1qpiwuu65-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-34wnsz0zn-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-g4g4yf0qk-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-jo5wyml3h-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-n0of9yuti-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-p79pwccy8-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-8tzwfjt8u-eapenthomas-projects.vercel.app",
     ]
     
     # Add any additional origins from environment variables
     additional_origins = os.environ.get('ADDITIONAL_CORS_ORIGINS', '')
     if additional_origins:
         origins.extend(additional_origins.split(','))
+    
+    # Add wildcard pattern for Vercel deployments
+    origins.append("https://*.vercel.app")
     
     return origins
 

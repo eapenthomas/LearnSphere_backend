@@ -189,6 +189,18 @@ async def simple_login(request: dict):
                 },
                 "token": "test-admin-token"
             }
+        elif email == "eapenthomas2026@mca.ajce.in" and password == "password123":
+            return {
+                "success": True,
+                "message": "Login successful",
+                "user": {
+                    "id": "admin-002",
+                    "email": "eapenthomas2026@mca.ajce.in",
+                    "role": "admin",
+                    "full_name": "Eapen Thomas"
+                },
+                "token": "test-eapen-admin-token"
+            }
         elif email == "teacher@learnsphere.com" and password == "teacher123":
             return {
                 "success": True,

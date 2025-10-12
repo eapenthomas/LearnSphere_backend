@@ -342,42 +342,123 @@ async def ai_tutor_response(request: dict = None):
         ]
     }
 
-@app.post("/api/test/quiz-generate")
-async def generate_test_quiz(request: dict):
-    """Generate test quiz"""
-    topic = request.get("topic", "Python Programming")
-    
-    return {
-        "quiz": {
-            "id": "quiz-001",
-            "title": f"Quiz: {topic}",
-            "questions": [
-                {
-                    "id": "q1",
-                    "question": "What is Python?",
-                    "options": [
-                        "A programming language",
-                        "A type of snake", 
-                        "A database",
-                        "An operating system"
+        @app.post("/api/test/quiz-generate")
+        async def generate_test_quiz(request: dict):
+            """Generate test quiz"""
+            topic = request.get("topic", "Python Programming")
+            
+            return {
+                "quiz": {
+                    "id": "quiz-001",
+                    "title": f"Quiz: {topic}",
+                    "questions": [
+                        {
+                            "id": "q1",
+                            "question": "What is Python?",
+                            "options": [
+                                "A programming language",
+                                "A type of snake", 
+                                "A database",
+                                "An operating system"
+                            ],
+                            "correct_answer": 0
+                        },
+                        {
+                            "id": "q2", 
+                            "question": "Which keyword is used to define a function in Python?",
+                            "options": [
+                                "function",
+                                "def",
+                                "define",
+                                "func"
+                            ],
+                            "correct_answer": 1
+                        }
                     ],
-                    "correct_answer": 0
+                    "duration": 30
+                }
+            }
+
+        # Admin dashboard endpoints
+        @app.get("/api/admin/dashboard/stats")
+        async def get_admin_dashboard_stats():
+            """Get admin dashboard statistics"""
+            return {
+                "total_users": 1247,
+                "total_teachers": 89,
+                "total_students": 1158,
+                "total_courses": 156,
+                "pending_approvals": 12,
+                "total_enrollments": 3421,
+                "active_users": 892,
+                "revenue": 45678.90,
+                "completion_rate": 78.5,
+                "user_growth": 15.3,
+                "course_rating": 4.7
+            }
+
+        @app.get("/api/admin/dashboard/activity")
+        async def get_admin_dashboard_activity(limit: int = 10):
+            """Get recent admin dashboard activity"""
+            activities = [
+                {
+                    "id": "act-001",
+                    "type": "user_registration",
+                    "message": "New student registered: John Doe",
+                    "timestamp": "2024-01-15T10:30:00Z",
+                    "user_email": "john.doe@example.com"
                 },
                 {
-                    "id": "q2", 
-                    "question": "Which keyword is used to define a function in Python?",
-                    "options": [
-                        "function",
-                        "def",
-                        "define",
-                        "func"
-                    ],
-                    "correct_answer": 1
+                    "id": "act-002", 
+                    "type": "teacher_approval",
+                    "message": "Teacher approved: Dr. Smith",
+                    "timestamp": "2024-01-15T09:15:00Z",
+                    "user_email": "dr.smith@example.com"
+                },
+                {
+                    "id": "act-003",
+                    "type": "course_created",
+                    "message": "New course created: Python Fundamentals",
+                    "timestamp": "2024-01-15T08:45:00Z",
+                    "user_email": "teacher@example.com"
+                },
+                {
+                    "id": "act-004",
+                    "type": "enrollment",
+                    "message": "Student enrolled in: Web Development",
+                    "timestamp": "2024-01-15T07:20:00Z",
+                    "user_email": "student@example.com"
+                },
+                {
+                    "id": "act-005",
+                    "type": "course_completed",
+                    "message": "Student completed: JavaScript Basics",
+                    "timestamp": "2024-01-14T16:30:00Z",
+                    "user_email": "student2@example.com"
                 }
-            ],
-            "duration": 30
-        }
-    }
+            ]
+            
+            return activities[:limit]
+
+        @app.get("/api/admin/dashboard/user-growth")
+        async def get_admin_dashboard_user_growth():
+            """Get user growth data for charts"""
+            return {
+                "data": [
+                    {"month": "Jan", "users": 120, "teachers": 8, "students": 112},
+                    {"month": "Feb", "users": 145, "teachers": 12, "students": 133},
+                    {"month": "Mar", "users": 178, "teachers": 15, "students": 163},
+                    {"month": "Apr", "users": 203, "teachers": 18, "students": 185},
+                    {"month": "May", "users": 245, "teachers": 22, "students": 223},
+                    {"month": "Jun", "users": 289, "teachers": 28, "students": 261},
+                    {"month": "Jul", "users": 334, "teachers": 32, "students": 302},
+                    {"month": "Aug", "users": 378, "teachers": 35, "students": 343},
+                    {"month": "Sep", "users": 412, "teachers": 38, "students": 374},
+                    {"month": "Oct", "users": 456, "teachers": 42, "students": 414},
+                    {"month": "Nov", "users": 498, "teachers": 45, "students": 453},
+                    {"month": "Dec", "users": 542, "teachers": 48, "students": 494}
+                ]
+            }
 
 # Root endpoint
 @app.get("/")

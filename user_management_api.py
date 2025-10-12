@@ -179,7 +179,7 @@ Dear {name},
 
 Your LearnSphere account has been activated! You can now access all features of the platform.
 
-Login at: http://localhost:3000
+Login at: {os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}
 
 Best regards,
 LearnSphere Team

@@ -485,14 +485,14 @@ async def send_course_completion_email(student_id: str, course_id: str):
                     <p>Thank you for choosing LearnSphere for your educational journey. We're proud to be part of your success!</p>
 
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="http://localhost:3000/dashboard" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold;">Continue Learning</a>
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/dashboard" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: bold;">Continue Learning</a>
                     </div>
                 </div>
 
                 <div style="text-align: center; color: #666; font-size: 14px; margin-top: 20px;">
                     <p>Best regards,<br>The LearnSphere Team</p>
                     <p style="margin-top: 20px;">
-                        <a href="http://localhost:3000" style="color: #667eea;">LearnSphere</a> |
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}" style="color: #667eea;">LearnSphere</a> |
                         <a href="mailto:support@learnsphere.com" style="color: #667eea;">Support</a>
                     </p>
                 </div>

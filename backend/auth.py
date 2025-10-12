@@ -237,10 +237,13 @@ class AuthService:
     @staticmethod
     async def get_google_oauth_url() -> dict:
         try:
+            # Get frontend URL from environment variable
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')
+            
             auth_response = supabase.auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {
-                    "redirect_to": "http://localhost:3000/auth/callback"
+                    "redirect_to": f"{frontend_url}/auth/callback"
                 }
             })
             return {"url": auth_response.url}

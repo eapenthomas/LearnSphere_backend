@@ -363,7 +363,7 @@ LearnSphere Team
             """
 
         elif event_type == "teacher_verification_approved":
-            frontend_url = event_data.get('frontend_url', 'http://localhost:3000')
+            frontend_url = event_data.get('frontend_url', os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app'))
             name = event_data.get('full_name', 'Teacher')
             subject = "🎉 Welcome to LearnSphere Faculty Portal"
             html_content = f"""
@@ -382,7 +382,7 @@ LearnSphere Team
             """
 
         elif event_type == "teacher_verification_rejected":
-            frontend_url = event_data.get('frontend_url', 'http://localhost:3000')
+            frontend_url = event_data.get('frontend_url', os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app'))
             name = event_data.get('full_name', 'User')
             reason = event_data.get('reason', 'Please contact support for more information.')
             subject = "Teacher Application Update - LearnSphere"

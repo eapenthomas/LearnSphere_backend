@@ -47,7 +47,7 @@ async def send_user_status_email(user_id: str, is_active: bool, admin_name: str 
             status_color = "#10b981"
             message_text = "Your account has been successfully activated and you can now access all LearnSphere features."
             action_text = "Login to Your Account"
-            action_url = "http://localhost:3000/login"
+            action_url = f"{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/login"
         else:
             subject = "⚠️ Your LearnSphere Account Has Been Suspended"
             status_text = "suspended"
@@ -96,7 +96,7 @@ async def send_user_status_email(user_id: str, is_active: bool, admin_name: str 
                 <div style="text-align: center; color: #666; font-size: 14px; margin-top: 20px;">
                     <p>Best regards,<br>The LearnSphere Team</p>
                     <p style="margin-top: 20px;">
-                        <a href="http://localhost:3000" style="color: #667eea;">LearnSphere</a> | 
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}" style="color: #667eea;">LearnSphere</a> | 
                         <a href="mailto:support@learnsphere.com" style="color: #667eea;">Support</a>
                     </p>
                 </div>
@@ -169,7 +169,7 @@ async def send_teacher_approval_email(teacher_id: str, approved: bool, admin_nam
             status_color = "#10b981"
             message_text = "Congratulations! Your teacher account has been approved and you can now start creating courses and managing students."
             action_text = "Access Teacher Dashboard"
-            action_url = "http://localhost:3000/teacher/dashboard"
+            action_url = f"{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/teacher/dashboard"
             
             additional_info = """
             <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
@@ -240,7 +240,7 @@ async def send_teacher_approval_email(teacher_id: str, approved: bool, admin_nam
                 <div style="text-align: center; color: #666; font-size: 14px; margin-top: 20px;">
                     <p>Best regards,<br>The LearnSphere Team</p>
                     <p style="margin-top: 20px;">
-                        <a href="http://localhost:3000" style="color: #667eea;">LearnSphere</a> | 
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}" style="color: #667eea;">LearnSphere</a> | 
                         <a href="mailto:support@learnsphere.com" style="color: #667eea;">Support</a>
                     </p>
                 </div>

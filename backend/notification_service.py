@@ -132,7 +132,7 @@ class NotificationService:
                     <p>To get started, please log in to your account using your registered credentials.</p>
                     
                     <div style="text-align: center;">
-                        <a href="http://localhost:3000/login" class="button">Access Your Account</a>
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/login" class="button">Access Your Account</a>
                     </div>
                     
                     <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
@@ -170,7 +170,7 @@ class NotificationService:
         - Access teacher dashboard
         
         To get started, please log in to your account using your registered credentials at:
-        http://localhost:3000/login
+        {os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/login
         
         If you have any questions or need assistance, please don't hesitate to contact our support team.
         
@@ -364,7 +364,7 @@ class NotificationService:
                     </ul>
 
                     <div style="text-align: center;">
-                        <a href="http://localhost:3000/login" class="button">Access Your Account</a>
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/login" class="button">Access Your Account</a>
                     </div>'''
 
             text_what_means = '''What this means:
@@ -372,7 +372,7 @@ class NotificationService:
         - All platform features are available to you
         - You can log in using your existing credentials
 
-        You can access your account at: http://localhost:3000/login'''
+        You can access your account at: {os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/login'''
         else:
             what_this_means = '''
                     <p><strong>What this means:</strong></p>

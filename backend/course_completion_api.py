@@ -82,7 +82,7 @@ def send_course_completion_email(user_email: str, user_name: str, course_title: 
                     </div>
                     
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="http://localhost:3000/courses" 
+                        <a href="{os.getenv('FRONTEND_URL', 'https://learn-sphere-frontend-black.vercel.app')}/courses" 
                            style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block;">
                             Explore More Courses
                         </a>

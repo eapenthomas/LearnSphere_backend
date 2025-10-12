@@ -40,6 +40,7 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [userGrowthData, setUserGrowthData] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -91,6 +92,13 @@ const AdminDashboard = () => {
         setRecentActivity(activity);
       }
 
+      // Fetch user growth data
+      const growthResponse = await fetch('http://localhost:8000/api/admin/dashboard/user-growth');
+      if (growthResponse.ok) {
+        const growthData = await growthResponse.json();
+        setUserGrowthData(growthData.data || []);
+      }
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -120,7 +128,7 @@ const AdminDashboard = () => {
       textColor: 'text-green-700',
       route: '/admin/users',
       filter: 'teachers',
-      description: 'Approved teaching staff'
+      description: 'Verified & active teachers'
     },
     {
       title: 'Pending Approvals',
@@ -131,7 +139,19 @@ const AdminDashboard = () => {
       textColor: 'text-yellow-700',
       route: '/admin/approvals',
       filter: null,
-      description: 'Teachers awaiting approval',
+      description: 'Manual verification needed',
+      actionRequired: true
+    },
+    {
+      title: 'Teacher Verification',
+      value: stats?.pending_verifications || 0,
+      icon: Shield,
+      color: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-blue-50',
+      textColor: 'text-blue-700',
+      route: '/admin/teacher-verification',
+      filter: null,
+      description: 'ID verification requests',
       actionRequired: true
     },
     {
@@ -170,14 +190,14 @@ const AdminDashboard = () => {
     }
   ];
 
-  // Sample data for charts
-  const userGrowthData = [
-    { name: 'Jan', students: 45, teachers: 8 },
-    { name: 'Feb', students: 52, teachers: 12 },
-    { name: 'Mar', students: 68, teachers: 15 },
-    { name: 'Apr', students: 78, teachers: 18 },
-    { name: 'May', students: 89, teachers: 22 },
-    { name: 'Jun', students: 95, teachers: 25 }
+  // Sample data for charts (fallback if no real data)
+  const fallbackGrowthData = [
+    { name: 'Jan', students: 0, teachers: 0 },
+    { name: 'Feb', students: 0, teachers: 0 },
+    { name: 'Mar', students: 0, teachers: 0 },
+    { name: 'Apr', students: 0, teachers: 0 },
+    { name: 'May', students: 0, teachers: 0 },
+    { name: 'Jun', students: 0, teachers: 0 }
   ];
 
   const userDistributionData = [
@@ -187,12 +207,24 @@ const AdminDashboard = () => {
   ];
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'Unknown Date';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error, dateString);
+      return 'Invalid Date';
+    }
   };
 
   const getActivityIcon = (action) => {
@@ -205,6 +237,12 @@ const AdminDashboard = () => {
         return <UserCheck className="w-4 h-4 text-blue-500" />;
       case 'teacher_rejected':
         return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      case 'New teacher registered':
+        return <GraduationCap className="w-4 h-4 text-purple-500" />;
+      case 'New student registered':
+        return <Users className="w-4 h-4 text-blue-500" />;
+      case 'Course created':
+        return <BookOpen className="w-4 h-4 text-green-500" />;
       default:
         return <Activity className="w-4 h-4 text-gray-500" />;
     }
@@ -354,7 +392,7 @@ const AdminDashboard = () => {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={userGrowthData}>
+                <LineChart data={userGrowthData.length > 0 ? userGrowthData : fallbackGrowthData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
                     dataKey="name"
@@ -512,15 +550,15 @@ const AdminDashboard = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900">
-                      {activity.profiles?.full_name || 'Unknown User'}
+                      {activity.user_name || 'Unknown User'}
                     </p>
                     <p className="text-sm text-gray-600 capitalize">
-                      {activity.action.replace('_', ' ')} • {activity.profiles?.role}
+                      {activity.action.replace('_', ' ')}
                     </p>
                   </div>
                   <div className="flex-shrink-0 text-right">
                     <p className="text-xs text-gray-500 font-medium">
-                      {formatDate(activity.created_at)}
+                      {formatDate(activity.timestamp)}
                     </p>
                     <div className="w-2 h-2 bg-green-400 rounded-full mt-1 ml-auto"></div>
                   </div>

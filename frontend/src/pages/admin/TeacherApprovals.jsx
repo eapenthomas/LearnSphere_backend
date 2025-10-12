@@ -151,8 +151,8 @@ const TeacherApprovals = () => {
   };
 
   const filteredRequests = pendingRequests.filter(request =>
-    request.profiles?.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    request.profiles?.email.toLowerCase().includes(searchTerm.toLowerCase())
+    request.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    request.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatDate = (dateString) => {
@@ -178,11 +178,11 @@ const TeacherApprovals = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-800">
-              {request.profiles?.full_name}
+              {request.full_name}
             </h3>
             <p className="text-sm text-gray-600 flex items-center space-x-1">
               <Mail className="w-4 h-4" />
-              <span>{request.profiles?.email}</span>
+              <span>{request.email}</span>
             </p>
           </div>
         </div>
@@ -197,11 +197,11 @@ const TeacherApprovals = () => {
       <div className="space-y-3 mb-6">
         <div className="flex items-center space-x-2 text-sm text-gray-600">
           <Calendar className="w-4 h-4" />
-          <span>Registered: {formatDate(request.profiles?.created_at)}</span>
+          <span>Registered: {formatDate(request.created_at)}</span>
         </div>
         <div className="flex items-center space-x-2 text-sm text-gray-600">
           <Clock className="w-4 h-4" />
-          <span>Request Date: {formatDate(request.request_date)}</span>
+          <span>Request Date: {formatDate(request.created_at)}</span>
         </div>
       </div>
 
@@ -229,8 +229,15 @@ const TeacherApprovals = () => {
         </button>
 
         <button
-          onClick={() => console.log('View details:', request)}
+          onClick={() => {
+            if (request.id_card_url) {
+              window.open(request.id_card_url, '_blank');
+            } else {
+              toast.error('No document available');
+            }
+          }}
           className="px-4 py-3 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all duration-300 hover:scale-105"
+          title="View ID Card Document"
         >
           <Eye className="w-4 h-4" />
         </button>
@@ -466,7 +473,7 @@ const TeacherApprovals = () => {
               </h3>
               
               <p className="text-gray-600 text-center mb-6">
-                Reject "{selectedRequest?.profiles?.full_name}"'s teacher application? They will receive an email with the reason.
+                Reject "{selectedRequest?.full_name}"'s teacher application? They will receive an email with the reason.
               </p>
               
               <div className="mb-6">

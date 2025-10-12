@@ -32,6 +32,7 @@ import QuizEdit from './pages/teacher/QuizEdit.jsx';
 import QuizSubmissions from './pages/teacher/QuizSubmissions.jsx';
 import AdminDashboard from './pages/admin/Dashboard.jsx';
 import TeacherApprovals from './pages/admin/TeacherApprovals.jsx';
+import TeacherVerification from './pages/admin/TeacherVerification.jsx';
 import UserManagement from './pages/admin/UserManagement.jsx';
 import ActivityLogs from './pages/admin/ActivityLogs.jsx';
 import EmailNotifications from './pages/admin/EmailNotifications.jsx';
@@ -277,6 +278,14 @@ const AppContent = () => {
                 element={
                     <ProtectedRoute>
                         <TeacherApprovals />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/teacher-verification"
+                element={
+                    <ProtectedRoute>
+                        <TeacherVerification />
                     </ProtectedRoute>
                 }
             />

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import Input from '../components/Input.jsx';
 import Button from '../components/Button.jsx';
+import TeacherVerificationForm from '../components/TeacherVerificationForm.jsx';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import {
@@ -12,13 +13,16 @@ import {
   EyeOff,
   User,
   Mail,
+  Building,
   Lock,
   GraduationCap,
   ArrowRight,
   AlertCircle,
   CheckCircle,
   Shield,
-  Zap
+  Zap,
+  Camera,
+  Upload
 } from 'lucide-react';
 
 const RegisterPage = () => {
@@ -27,6 +31,7 @@ const RegisterPage = () => {
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
+    institution_name: '',
     password: '',
     confirm_password: '',
     role: 'student'
@@ -35,6 +40,9 @@ const RegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showEnhancedVerification, setShowEnhancedVerification] = useState(false);
+  const [verificationMethod, setVerificationMethod] = useState(null); // 'manual' or 'enhanced'
+  const [verificationDocument, setVerificationDocument] = useState(null);
 
   // Real-time validation states
   const [validationErrors, setValidationErrors] = useState({});
@@ -123,6 +131,14 @@ const RegisterPage = () => {
         }
         break;
 
+      case 'institution_name':
+        if (formData.role === 'teacher' && !value.trim()) {
+          errors.institution_name = 'Institution name is required for teachers';
+        } else if (value.trim() && value.trim().length < 2) {
+          errors.institution_name = 'Institution name must be at least 2 characters long';
+        }
+        break;
+
       case 'password':
         if (!value) {
           errors.password = 'Password is required';
@@ -155,6 +171,11 @@ const RegisterPage = () => {
       ...formData,
       [name]: value
     });
+
+    // Reset verification method when role changes
+    if (name === 'role') {
+      setVerificationMethod(null);
+    }
 
     // Mark field as touched
     setTouched({
@@ -231,24 +252,68 @@ const RegisterPage = () => {
     setLoading(true);
     setError('');
 
-    const { confirm_password, ...registerData } = formData;
-
-    const result = await register(registerData);
-
-    if (result.success) {
-      if (formData.role === 'teacher') {
-        // Teacher registration requires approval
-        toast.success('Registration successful! Your account is pending admin approval. You will receive an email notification once approved.');
-        navigate('/login');
+    try {
+      if (formData.role === 'teacher' && verificationMethod === 'manual') {
+        // Handle manual verification for teachers
+        await handleManualTeacherRegistration();
+      } else if (formData.role === 'teacher' && verificationMethod === 'enhanced') {
+        // Enhanced verification is handled by the modal
+        toast.error('Please use the Enhanced Verification modal to complete your registration.');
+        setLoading(false);
+        return;
       } else {
-        // Student registration is immediate
-        navigate('/dashboard');
+        // Regular student registration or manual teacher without verification method
+        const { confirm_password, ...registerData } = formData;
+        const result = await register(registerData);
+
+        if (result.success) {
+          if (formData.role === 'teacher') {
+            toast.success('Registration successful! Your account is pending admin approval. You will receive an email notification once approved.');
+            navigate('/login');
+          } else {
+            navigate('/dashboard');
+          }
+        } else {
+          setError(result.error);
+        }
       }
-    } else {
-      setError(result.error);
+    } catch (error) {
+      setError(error.message || 'Registration failed. Please try again.');
     }
 
     setLoading(false);
+  };
+
+  const handleManualTeacherRegistration = async () => {
+    const { confirm_password, ...registerData } = formData;
+    
+    // Create FormData for file upload
+    const formDataToSend = new FormData();
+    formDataToSend.append('full_name', registerData.full_name);
+    formDataToSend.append('email', registerData.email);
+    formDataToSend.append('institution_name', registerData.institution_name);
+    formDataToSend.append('password', registerData.password);
+    
+    // Add verification document if uploaded
+    if (verificationDocument) {
+      formDataToSend.append('verification_document', verificationDocument);
+    } else {
+      throw new Error('Verification document is required for manual approval');
+    }
+
+    const response = await fetch('http://localhost:8000/api/teacher-verification/register-manual', {
+      method: 'POST',
+      body: formDataToSend,
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      toast.success(result.message || 'Registration successful! Your documents have been submitted for manual review.');
+      navigate('/login?message=manual_verification_submitted');
+    } else {
+      throw new Error(result.detail || 'Manual registration failed');
+    }
   };
 
   const handleGoogleSignup = async () => {
@@ -334,7 +399,119 @@ const RegisterPage = () => {
             className="bg-white rounded-2xl shadow-lg border border-gray-100 mobile-padding sm:p-8 lg:p-10 hover:shadow-xl transition-all duration-300 w-full"
           >
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Full Name Input */}
+              {/* Role Selection - First Step */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-4">
+                  I am a
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="student"
+                      checked={formData.role === 'student'}
+                      onChange={handleChange}
+                      className="sr-only"
+                    />
+                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex items-center justify-center ${formData.role === 'student' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                      }`}>
+                      {formData.role === 'student' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                    </div>
+                    <div className="flex items-center">
+                      <GraduationCap className="w-5 h-5 text-gray-600 mr-2" />
+                      <span className="font-medium text-gray-700">Student</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="teacher"
+                      checked={formData.role === 'teacher'}
+                      onChange={handleChange}
+                      className="sr-only"
+                    />
+                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex items-center justify-center ${formData.role === 'teacher' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                      }`}>
+                      {formData.role === 'teacher' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                    </div>
+                    <div className="flex items-center">
+                      <BookOpen className="w-5 h-5 text-gray-600 mr-2" />
+                      <span className="font-medium text-gray-700">Teacher</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Teacher Verification Method Selection */}
+              {formData.role === 'teacher' && !verificationMethod && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Choose Verification Method</h3>
+                    <p className="text-sm text-gray-600">Select how you'd like to verify your teacher status</p>
+                  </div>
+                  
+                  {/* Manual Approval Option */}
+                  <button
+                    type="button"
+                    onClick={() => setVerificationMethod('manual')}
+                    className="w-full bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                          <User className="w-5 h-5 text-gray-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">Manual Approval</h4>
+                          <p className="text-sm text-gray-600">Admin will review your application</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-gray-500">2-3 business days</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Enhanced Verification Option */}
+                  <button
+                    type="button"
+                    onClick={() => setVerificationMethod('enhanced')}
+                    className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-4 hover:border-blue-400 transition-colors text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <Camera className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">Enhanced Verification</h4>
+                          <p className="text-sm text-gray-700">Upload ID card for faster approval</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-blue-600 font-medium">Same day approval</span>
+                      </div>
+                    </div>
+                  </button>
+                </motion.div>
+              )}
+
+              {/* Form Fields - Show based on role and verification method */}
+              {(formData.role === 'student' || (formData.role === 'teacher' && verificationMethod)) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  {/* Full Name Input */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Full Name
@@ -474,6 +651,77 @@ const RegisterPage = () => {
                   </motion.p>
                 )}
               </div>
+
+              {/* Institution Name Input - Only for Teachers */}
+              {formData.role === 'teacher' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Institution Name
+                  </label>
+                  <div className="relative">
+                    <Building className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+                      validationErrors.institution_name && touched.institution_name
+                        ? 'text-red-400'
+                        : formData.institution_name && !validationErrors.institution_name && touched.institution_name
+                        ? 'text-green-400'
+                        : 'text-gray-400'
+                    }`} />
+                    <input
+                      type="text"
+                      name="institution_name"
+                      value={formData.institution_name}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      placeholder="Enter your institution name"
+                      required
+                      className={`w-full pl-10 pr-10 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 ${
+                        validationErrors.institution_name && touched.institution_name
+                          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                          : formData.institution_name && !validationErrors.institution_name && touched.institution_name
+                          ? 'border-green-300 focus:border-green-500 focus:ring-green-500'
+                          : ''
+                      }`}
+                    />
+                    {/* Validation Icon */}
+                    {touched.institution_name && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        {validationErrors.institution_name ? (
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                        ) : formData.institution_name ? (
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                  {/* Error Message */}
+                  {validationErrors.institution_name && touched.institution_name && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-2 text-sm text-red-600 flex items-center"
+                    >
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      {validationErrors.institution_name}
+                    </motion.p>
+                  )}
+                  {/* Success Message */}
+                  {!validationErrors.institution_name && formData.institution_name && touched.institution_name && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-2 text-sm text-green-600 flex items-center"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Institution name looks good!
+                    </motion.p>
+                  )}
+                </motion.div>
+              )}
 
               {/* Password Input */}
               <div>
@@ -617,50 +865,99 @@ const RegisterPage = () => {
                 )}
               </div>
 
-              {/* Role Selection */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  I am a
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="student"
-                      checked={formData.role === 'student'}
-                      onChange={handleChange}
-                      className="sr-only"
-                    />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex items-center justify-center ${formData.role === 'student' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                  {/* Verification Document Upload for Manual Verification */}
+                  {formData.role === 'teacher' && verificationMethod === 'manual' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Verification Document
+                      </label>
+                      <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                        verificationDocument ? 'border-green-300 bg-green-50' : 'border-gray-300 hover:border-blue-400'
                       }`}>
-                      {formData.role === 'student' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                        {verificationDocument ? (
+                          <div className="space-y-2">
+                            <CheckCircle className="w-8 h-8 mx-auto text-green-500" />
+                            <p className="text-green-600 font-medium">{verificationDocument.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {(verificationDocument.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setVerificationDocument(null)}
+                              className="text-red-500 text-sm hover:text-red-700"
+                            >
+                              Remove file
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Upload className="w-8 h-8 mx-auto text-gray-400" />
+                            <p className="text-gray-600">Upload verification document</p>
+                            <p className="text-sm text-gray-500">
+                              PNG, JPG, JPEG, PDF, GIF, BMP (Max 10MB)
+                            </p>
+                            <input
+                              type="file"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  const allowedTypes = ['.png', '.jpg', '.jpeg', '.pdf', '.gif', '.bmp'];
+                                  const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+                                  
+                                  if (allowedTypes.includes(fileExtension)) {
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast.error('File size must be less than 10MB');
+                                      return;
+                                    }
+                                    setVerificationDocument(file);
+                                    toast.success('Document uploaded successfully!');
+                                  } else {
+                                    toast.error('Please upload a valid document file');
+                                  }
+                                }
+                              }}
+                              accept=".png,.jpg,.jpeg,.pdf,.gif,.bmp"
+                              className="hidden"
+                              id="verification-document-upload"
+                            />
+                            <label
+                              htmlFor="verification-document-upload"
+                              className="inline-block bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 cursor-pointer transition-colors"
+                            >
+                              Choose Document
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        Upload any document that proves your teaching credentials (ID card, certificate, etc.)
+                      </p>
                     </div>
-                    <div className="flex items-center">
-                      <GraduationCap className="w-5 h-5 text-gray-600 mr-2" />
-                      <span className="font-medium text-gray-700">Student</span>
+                  )}
+
+                  {/* Enhanced Verification Button for Teachers */}
+                  {formData.role === 'teacher' && verificationMethod === 'enhanced' && (
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Camera className="w-5 h-5 text-blue-600 mr-2" />
+                          <div>
+                            <h4 className="font-semibold text-gray-900">Upload ID Card</h4>
+                            <p className="text-sm text-gray-700">Complete your enhanced verification</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowEnhancedVerification(true)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                          Upload Now
+                        </button>
+                      </div>
                     </div>
-                  </label>
-                  <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="teacher"
-                      checked={formData.role === 'teacher'}
-                      onChange={handleChange}
-                      className="sr-only"
-                    />
-                    <div className={`w-4 h-4 border-2 rounded-full mr-3 flex items-center justify-center ${formData.role === 'teacher' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                      }`}>
-                      {formData.role === 'teacher' && <div className="w-2 h-2 bg-white rounded-full"></div>}
-                    </div>
-                    <div className="flex items-center">
-                      <BookOpen className="w-5 h-5 text-gray-600 mr-2" />
-                      <span className="font-medium text-gray-700">Teacher</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
+                  )}
+                </motion.div>
+              )}
 
               {/* Error Message */}
               {error && (
@@ -786,6 +1083,46 @@ const RegisterPage = () => {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Enhanced Verification Modal */}
+      {showEnhancedVerification && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={() => setShowEnhancedVerification(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Enhanced Teacher Verification</h2>
+                <button
+                  onClick={() => setShowEnhancedVerification(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              <TeacherVerificationForm
+                formData={formData}
+                onClose={() => setShowEnhancedVerification(false)}
+                onSuccess={(result) => {
+                  setShowEnhancedVerification(false);
+                  toast.success('Registration successful! Your ID is being verified.');
+                  navigate('/login?message=registration_successful');
+                }}
+              />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };

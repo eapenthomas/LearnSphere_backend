@@ -436,6 +436,172 @@ LearnSphere Team
             </html>
             """
 
+        elif event_type == "teacher_verification_success":
+            subject = f"Teacher Auto-Approved - {event_data.get('teacher_name', 'Teacher')}"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🎓 LearnSphere</div>
+                    <h2 style="color: #10b981;">Teacher Auto-Approved</h2>
+                </div>
+                <div class="content">
+                    <p>Hello Admin,</p>
+                    <p>A new teacher has been automatically approved through OCR verification:</p>
+                    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <ul style="list-style: none; padding: 0;">
+                            <li><strong>👤 Teacher:</strong> {event_data.get('teacher_name', 'N/A')}</li>
+                            <li><strong>🏫 Institution:</strong> {event_data.get('institution_name', 'N/A')}</li>
+                            <li><strong>🤖 AI Confidence:</strong> {event_data.get('confidence', 'N/A')}%</li>
+                            <li><strong>🆔 User ID:</strong> {event_data.get('user_id', 'N/A')}</li>
+                            <li><strong>✅ Status:</strong> Auto-approved (No action required)</li>
+                        </ul>
+                    </div>
+                    <p>The OCR verification passed with high confidence, so the account has been automatically approved and activated.</p>
+                    <a href="{event_data.get('admin_dashboard_url', '#')}" class="button" style="background-color: #10b981;">View Dashboard</a>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "teacher_verification_failed":
+            subject = "Teacher Verification Failed - Action Required"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🎓 LearnSphere</div>
+                    <h2 style="color: #dc2626;">Verification Issue Detected</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('teacher_name', 'Teacher')},</p>
+                    <p>We were unable to verify your teacher ID card through our automated system.</p>
+                    <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; color: #dc2626;"><strong>⚠️ Verification Details:</strong></p>
+                        <p style="margin: 10px 0; color: #dc2626; font-weight: 500;">{event_data.get('failure_reason', 'Unable to verify ID card details')}</p>
+                        <p style="margin: 5px 0; color: #dc2626; font-size: 14px;">Confidence Score: {event_data.get('confidence', 0)}%</p>
+                    </div>
+                    <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; color: #0369a1;"><strong>💡 Common Issues & Solutions:</strong></p>
+                        <ul style="margin: 10px 0 0 20px; color: #0369a1;">
+                            <li>Ensure your name on the ID matches your registration exactly</li>
+                            <li>Check that institution name matches (case doesn't matter)</li>
+                            <li>Make sure the ID card image is clear and readable</li>
+                            <li>Verify the document shows your full name and institution</li>
+                        </ul>
+                    </div>
+                    <p><strong>Next Steps:</strong></p>
+                    <ol>
+                        <li>Review your registration details and ID card information</li>
+                        <li>Ensure the names and institution match</li>
+                        <li>Take a clear, well-lit photo of your ID card</li>
+                        <li>Re-upload your verification document</li>
+                    </ol>
+                    <a href="{event_data.get('reupload_url', '#')}" class="button" style="background-color: #dc2626;">Re-upload ID Card</a>
+                </div>
+                <div class="footer">
+                    <p>If you continue to experience issues, please contact our support team.<br>
+                    Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "teacher_verification_success_teacher":
+            subject = "Teacher Account Approved - Welcome to LearnSphere!"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🎓 LearnSphere</div>
+                    <h2 style="color: #10b981;">Welcome to LearnSphere!</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('teacher_name', 'Teacher')},</p>
+                    <p>Congratulations! Your teacher ID card has been successfully verified and your account is now active.</p>
+                    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; color: #166534;"><strong>✅ Account Details:</strong></p>
+                        <ul style="margin: 10px 0 0 20px; color: #166534;">
+                            <li>OCR verification passed ({event_data.get('confidence', 'N/A')}% confidence)</li>
+                            <li>Account approved and activated</li>
+                            <li>Full teacher privileges granted</li>
+                        </ul>
+                    </div>
+                    <p>You can now access your teacher dashboard and start creating courses!</p>
+                    <a href="{event_data.get('dashboard_url', '#')}" class="button" style="background-color: #10b981;">Access Teacher Dashboard</a>
+                </div>
+                <div class="footer">
+                    <p>Welcome to the LearnSphere teaching community!<br>
+                    Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "teacher_manual_review":
+            subject = f"Manual Teacher Verification Request - {event_data.get('teacher_name', 'Teacher')}"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🎓 LearnSphere</div>
+                    <h2 style="color: #f59e0b;">Manual Verification Required</h2>
+                </div>
+                <div class="content">
+                    <p>Hello Admin,</p>
+                    <p>A new teacher has submitted documents for manual verification:</p>
+                    <div style="background-color: #fef3c7; border: 1px solid #fcd34d; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <ul style="list-style: none; padding: 0;">
+                            <li><strong>👤 Teacher:</strong> {event_data.get('teacher_name', 'N/A')}</li>
+                            <li><strong>🏫 Institution:</strong> {event_data.get('institution_name', 'N/A')}</li>
+                            <li><strong>🆔 User ID:</strong> {event_data.get('user_id', 'N/A')}</li>
+                            <li><strong>📋 Status:</strong> Manual review required</li>
+                        </ul>
+                    </div>
+                    <p>Please review the verification documents and approve or reject the application.</p>
+                    <a href="{event_data.get('admin_dashboard_url', '#')}" class="button" style="background-color: #f59e0b;">Review Documents</a>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
+        elif event_type == "teacher_manual_review_teacher":
+            subject = "Teacher Verification Submitted - Manual Review"
+            html_content = f"""
+            <!DOCTYPE html><html><head>{base_style}</head><body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🎓 LearnSphere</div>
+                    <h2 style="color: #f59e0b;">Manual Review Submitted</h2>
+                </div>
+                <div class="content">
+                    <p>Hello {event_data.get('teacher_name', 'Teacher')},</p>
+                    <p>You have failed automated verification, so your request has been submitted for manual review by our admin team.</p>
+                    <div style="background-color: #fef3c7; border: 1px solid #fcd34d; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0; color: #92400e;"><strong>📋 Review Status:</strong></p>
+                        <ul style="margin: 10px 0 0 20px; color: #92400e;">
+                            <li>Automated verification failed</li>
+                            <li>Manual review submitted</li>
+                            <li>Admin approval required</li>
+                        </ul>
+                    </div>
+                    <p>You will receive an email notification once your account has been reviewed. This typically takes 1-2 business days.</p>
+                    <a href="{event_data.get('dashboard_url', '#')}" class="button" style="background-color: #f59e0b;">View Dashboard</a>
+                </div>
+                <div class="footer">
+                    <p>Thank you for choosing LearnSphere!<br>
+                    Best regards,<br>The LearnSphere Team</p>
+                </div>
+            </div>
+            </body></html>
+            """
+
         else:
             return None, None
 

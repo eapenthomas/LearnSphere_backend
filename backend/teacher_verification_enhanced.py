@@ -94,12 +94,13 @@ def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
             
             # Extract text using OCR
             try:
+                # Configure Tesseract path for Windows
+                pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
                 text = pytesseract.image_to_string(image, lang='eng')
                 return text.strip()
             except Exception as ocr_error:
                 print(f"OCR failed: {ocr_error}")
-                # Return mock text for testing when OCR is not available
-                return "MOCK TEACHER ID CARD\nName: Test Teacher\nInstitution: Test University\nID: 12345"
+                raise HTTPException(status_code=400, detail=f"Failed to extract text from image: {str(ocr_error)}")
             
         elif filename.lower().endswith('.pdf'):
             # Handle PDF files with pdfplumber
@@ -149,21 +150,29 @@ Institution: {institution_name}
 
 Task: Determine if the ID card likely belongs to the person and institution above.
 Consider:
-- Name similarity (exact match, partial match, phonetic similarity)
-- Institution name similarity
+- Name similarity (ignore titles like Dr., Prof., Mr., Ms. - focus on actual names)
+- Case insensitive matching (Priya Sharma = priya sharma)
+- Institution name similarity (IIT Mumbai = iit mumbai, ignore case and abbreviations)
+- Partial name matches (Dr. Priya Sharma matches "priya sharma")
 - Overall document authenticity indicators
 - Any red flags or inconsistencies
+
+IMPORTANT: Be flexible with name matching:
+- "Dr. Priya Sharma" should match "priya sharma"
+- "IIT Mumbai" should match "iit mumbai"
+- "Prof. John Doe" should match "john doe"
+- Focus on the core name and institution, ignore titles and case differences
 
 Respond with a JSON object:
 {{
     "match_confidence": (0-100),
-    "reason": "short justification"
+    "reason": "detailed justification including specific matching details"
 }}
 
-Be conservative - only approve if reasonably confident (70+).
+Be reasonable - approve if names and institutions clearly match (60+ confidence).
 """
 
-        response = openai_client.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional identity verification assistant. Always respond with valid JSON."},
@@ -288,8 +297,8 @@ async def register_teacher_with_verification(
             "ocr_status": ocr_status,
             "ai_confidence": ai_result.match_confidence,
             "verification_reason": ai_result.reason,
-            "is_verified": False,
-            "approval_status": "pending" if ocr_status == "passed" else "rejected"
+            "is_verified": ocr_status == "passed",  # Auto-verify if OCR passes
+            "approval_status": "approved" if ocr_status == "passed" else "rejected"
         }
         
         # Insert profile
@@ -313,19 +322,29 @@ async def register_teacher_with_verification(
         
         # Send appropriate email based on OCR result
         if ocr_status == "passed":
-            # Send email to admin for approval
+            # Send notification to admin about successful verification
             background_tasks.add_task(
                 send_admin_notification_email,
                 user_id, full_name, institution_name, ai_result.match_confidence
             )
-            message = "Registration successful! Your ID card has been verified. Please wait for admin approval."
-        else:
-            # Send rejection email to teacher
+            # Send success email to teacher - they are now approved
             background_tasks.add_task(
-                send_verification_failure_email,
+                send_teacher_verification_success_email,
+                email, full_name, ai_result.match_confidence
+            )
+            message = "Registration successful! Your ID card has been verified and your account is now active."
+        else:
+            # Send manual review email to teacher (OCR failed, but goes to manual approval)
+            background_tasks.add_task(
+                send_teacher_manual_review_email,
                 email, full_name
             )
-            message = f"Registration completed but ID verification failed (confidence: {ai_result.match_confidence}%). Please check your email for re-upload instructions."
+            # Send notification to admin about manual review needed
+            background_tasks.add_task(
+                send_admin_manual_review_notification,
+                user_id, full_name, institution_name
+            )
+            message = f"Registration completed. Your ID verification requires manual review (confidence: {ai_result.match_confidence}%). You will receive an email once reviewed."
         
         return TeacherRegistrationResponse(
             success=True,
@@ -371,16 +390,18 @@ async def get_verification_status(user_id: str):
 async def get_pending_teacher_requests(admin: TokenData = Depends(get_current_admin)):
     """Get all pending teacher verification requests for admin review"""
     try:
-        response = supabase_admin.table("teacher_verification_requests").select("""
-            *,
-            profiles!teacher_verification_requests_user_id_fkey (
-                id,
-                full_name,
-                email,
-                institution_name,
-                created_at
-            )
-        """).eq("ocr_status", "passed").execute()
+        # Get teachers who need manual approval (OCR failed or manual verification)
+        response = supabase_admin.table("profiles").select("""
+            id,
+            full_name,
+            email,
+            institution_name,
+            created_at,
+            ocr_status,
+            ai_confidence,
+            verification_reason,
+            id_card_url
+        """).eq("role", "teacher").eq("approval_status", "pending").execute()
         
         return {
             "success": True,
@@ -466,8 +487,33 @@ async def approve_or_reject_teacher(
 async def send_admin_notification_email(user_id: str, teacher_name: str, institution_name: str, confidence: int):
     """Send notification email to admin about new teacher verification request"""
     try:
-        admin_email = "eapentkadamapuzha@gmail.com"  # Replace with actual admin email
+        from email_service import EmailService
         
+        admin_email = "eapentkadamapuzha@gmail.com"
+        email_service = EmailService()
+        
+        # Prepare event data for email template
+        event_data = {
+            "teacher_name": teacher_name,
+            "institution_name": institution_name,
+            "confidence": confidence,
+            "user_id": user_id,
+            "admin_dashboard_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/admin/teacher-verification"
+        }
+        
+        # Send email using the email service
+        success = email_service.send_event_notification(
+            to_email=admin_email,
+            event_type="teacher_verification_success",
+            event_data=event_data
+        )
+        
+        if success:
+            print(f"✅ Admin notification email sent to {admin_email}")
+        else:
+            print(f"❌ Failed to send admin notification email to {admin_email}")
+            
+        # Also store in database for backup
         email_data = {
             "recipient_email": admin_email,
             "subject": f"New Teacher Verification Request - {teacher_name}",
@@ -489,11 +535,34 @@ async def send_admin_notification_email(user_id: str, teacher_name: str, institu
     except Exception as e:
         print(f"Failed to send admin notification email: {e}")
 
-async def send_verification_failure_email(email: str, teacher_name: str):
-    """Send verification failure email to teacher"""
+async def send_verification_failure_email(email: str, teacher_name: str, failure_reason: str = None, confidence: int = None):
+    """Send verification failure email to teacher with detailed reason"""
     try:
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        from email_service import EmailService
         
+        email_service = EmailService()
+        
+        # Prepare event data for email template
+        event_data = {
+            "teacher_name": teacher_name,
+            "failure_reason": failure_reason or "Unable to verify ID card details",
+            "confidence": confidence or 0,
+            "reupload_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reupload-id"
+        }
+        
+        # Send email using the email service
+        success = email_service.send_event_notification(
+            to_email=email,
+            event_type="teacher_verification_failed",
+            event_data=event_data
+        )
+        
+        if success:
+            print(f"✅ Verification failure email sent to {email}")
+        else:
+            print(f"❌ Failed to send verification failure email to {email}")
+            
+        # Also store in database for backup
         html_content = f"""
         <html>
         <body style="background-color:#1b1b1b; color:white; text-align:center; font-family:'Poppins', sans-serif; padding:40px;">
@@ -502,7 +571,7 @@ async def send_verification_failure_email(email: str, teacher_name: str):
                 <h2 style="margin-top: 20px; color: #ff4b5c;">Verification Issue Detected</h2>
                 <p>Hi {teacher_name},</p>
                 <p>We were unable to verify your teacher ID card. Please ensure your upload is clear and readable.</p>
-                <a href="{frontend_url}/reupload-id" style="background-color:#ff4b5c; padding:10px 20px; border-radius:8px; color:white; text-decoration:none; display:inline-block; margin:20px 0;">Re-upload ID</a>
+                <a href="{event_data['reupload_url']}" style="background-color:#ff4b5c; padding:10px 20px; border-radius:8px; color:white; text-decoration:none; display:inline-block; margin:20px 0;">Re-upload ID</a>
                 <p style="margin-top:30px; font-size:12px; opacity:0.8;">LearnSphere © 2025</p>
             </div>
         </body>
@@ -520,6 +589,63 @@ async def send_verification_failure_email(email: str, teacher_name: str):
         
     except Exception as e:
         print(f"Failed to send verification failure email: {e}")
+
+async def send_teacher_verification_success_email(email: str, teacher_name: str, confidence: int):
+    """Send verification success email to teacher"""
+    try:
+        from email_service import EmailService
+        
+        email_service = EmailService()
+        
+        # Prepare event data for email template
+        event_data = {
+            "teacher_name": teacher_name,
+            "confidence": confidence,
+            "dashboard_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/teacher/dashboard"
+        }
+        
+        # Send email using the email service
+        success = email_service.send_event_notification(
+            to_email=email,
+            event_type="teacher_verification_success_teacher",
+            event_data=event_data
+        )
+        
+        if success:
+            print(f"✅ Verification success email sent to teacher {email}")
+        else:
+            print(f"❌ Failed to send verification success email to teacher {email}")
+            
+        # Also store in database for backup
+        html_content = f"""
+        <html>
+        <body style="background-color:#1b1b1b; color:white; text-align:center; font-family:'Poppins', sans-serif; padding:40px;">
+            <div style="background:rgba(255,255,255,0.1); border-radius:20px; padding:30px; max-width:500px; margin:auto;">
+                <img src="https://yourcdn.com/learnsphere-logo.png" width="100" alt="LearnSphere Logo"/>
+                <h2 style="margin-top: 20px; color: #10b981;">Verification Successful!</h2>
+                <p>Hi {teacher_name},</p>
+                <p>Great news! Your teacher ID card has been successfully verified with {confidence}% confidence.</p>
+                <div style="background: rgba(16, 185, 129, 0.2); border-radius: 10px; padding: 15px; margin: 20px 0;">
+                    <p style="margin: 0;">✅ OCR verification passed<br>⏳ Awaiting admin approval</p>
+                </div>
+                <p>Your application is now pending admin review. You'll receive another email once approved.</p>
+                <p style="margin-top:30px; font-size:12px; opacity:0.8;">LearnSphere © 2025</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        email_data = {
+            "recipient_email": email,
+            "subject": "Teacher Verification Successful - Awaiting Approval",
+            "body": html_content,
+            "notification_type": "teacher_verification_success_teacher"
+        }
+        
+        supabase_admin.table("email_notifications").insert(email_data).execute()
+        
+    except Exception as e:
+        print(f"Failed to send teacher verification success email: {e}")
 
 async def send_teacher_approval_email(email: str, teacher_name: str):
     """Send approval email to teacher"""
@@ -587,3 +713,218 @@ async def send_teacher_rejection_email(email: str, teacher_name: str, admin_note
         
     except Exception as e:
         print(f"Failed to send teacher rejection email: {e}")
+
+@router.post("/register-manual", response_model=TeacherRegistrationResponse)
+async def register_teacher_manual_verification(
+    background_tasks: BackgroundTasks,
+    full_name: str = Form(...),
+    email: EmailStr = Form(...),
+    institution_name: str = Form(...),
+    password: str = Form(...),
+    verification_document: UploadFile = File(...)
+):
+    """Register a teacher with manual verification (no OCR)"""
+    try:
+        # Validate file
+        if not verification_document.filename:
+            raise HTTPException(status_code=400, detail="Verification document is required")
+        
+        allowed_extensions = ['.png', '.jpg', '.jpeg', '.pdf', '.gif', '.bmp']
+        file_extension = os.path.splitext(verification_document.filename.lower())[1]
+        
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}"
+            )
+        
+        # Check if file size is within limit (10MB)
+        file_bytes = verification_document.file.read()
+        if len(file_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+        
+        # Reset file pointer
+        verification_document.file.seek(0)
+        
+        # Check if email already exists
+        existing_user = supabase_admin.table("profiles").select("id").eq("email", email).execute()
+        if existing_user.data:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Generate user ID and hash password
+        user_id = str(uuid.uuid4())
+        salt, password_hash = AuthService.hash_password(password)
+        
+        # Upload verification document
+        doc_url = await upload_id_card_to_storage(
+            file_bytes, 
+            verification_document.filename, 
+            user_id
+        )
+        
+        # Create profile for manual verification
+        profile_data = {
+            "id": user_id,
+            "email": email,
+            "full_name": full_name,
+            "role": "teacher",
+            "institution_name": institution_name,
+            "password_salt": salt,
+            "password_hash": password_hash,
+            "id_card_url": doc_url,
+            "ocr_status": "manual",  # Manual verification
+            "ai_confidence": 0,
+            "verification_reason": "Manual verification - admin review required",
+            "is_verified": False,
+            "approval_status": "pending"  # Requires admin approval
+        }
+        
+        # Insert profile
+        profile_response = supabase_admin.table("profiles").insert(profile_data).execute()
+        
+        if not profile_response.data:
+            raise HTTPException(status_code=500, detail="Failed to create teacher profile")
+        
+        # Create verification request for admin review
+        verification_data = {
+            "user_id": user_id,
+            "institution_name": institution_name,
+            "id_card_url": doc_url,
+            "ocr_text": None,  # No OCR for manual verification
+            "ai_confidence": 0,
+            "ai_reason": "Manual verification - awaiting admin review",
+            "ocr_status": "manual"
+        }
+        
+        verification_response = supabase_admin.table("teacher_verification_requests").insert(verification_data).execute()
+        
+        # Send notification to admin for manual review
+        background_tasks.add_task(
+            send_admin_manual_review_notification,
+            user_id, full_name, institution_name
+        )
+        
+        # Send email to teacher about manual review
+        background_tasks.add_task(
+            send_teacher_manual_review_email,
+            email, full_name
+        )
+        
+        return TeacherRegistrationResponse(
+            success=True,
+            user_id=user_id,
+            message="Registration successful! Your verification document has been submitted for manual review. You will receive an email once approved.",
+            ocr_status="manual",
+            ai_confidence=0,
+            reason="Manual verification submitted for admin review"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+async def send_admin_manual_review_notification(user_id: str, teacher_name: str, institution_name: str):
+    """Send notification email to admin about manual verification request"""
+    try:
+        from email_service import EmailService
+        
+        admin_email = "eapentkadamapuzha@gmail.com"
+        email_service = EmailService()
+        
+        # Prepare event data for email template
+        event_data = {
+            "teacher_name": teacher_name,
+            "institution_name": institution_name,
+            "user_id": user_id,
+            "admin_dashboard_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/admin/teacher-verification"
+        }
+        
+        # Send email using the email service
+        success = email_service.send_event_notification(
+            to_email=admin_email,
+            event_type="teacher_manual_review",
+            event_data=event_data
+        )
+        
+        if success:
+            print(f"✅ Manual review notification sent to admin {admin_email}")
+        else:
+            print(f"❌ Failed to send manual review notification to admin {admin_email}")
+            
+        # Also store in database for backup
+        email_data = {
+            "recipient_email": admin_email,
+            "subject": f"Manual Teacher Verification Request - {teacher_name}",
+            "body": f"""
+            A new teacher has submitted documents for manual verification:
+            
+            Teacher: {teacher_name}
+            Institution: {institution_name}
+            User ID: {user_id}
+            
+            Please review the verification documents in the admin dashboard.
+            """,
+            "notification_type": "teacher_manual_review"
+        }
+        
+        supabase_admin.table("email_notifications").insert(email_data).execute()
+        
+    except Exception as e:
+        print(f"Failed to send admin manual review notification: {e}")
+
+async def send_teacher_manual_review_email(email: str, teacher_name: str):
+    """Send manual review confirmation email to teacher"""
+    try:
+        from email_service import EmailService
+        
+        email_service = EmailService()
+        
+        # Prepare event data for email template
+        event_data = {
+            "teacher_name": teacher_name,
+            "dashboard_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/teacher/dashboard"
+        }
+        
+        # Send email using the email service
+        success = email_service.send_event_notification(
+            to_email=email,
+            event_type="teacher_manual_review_teacher",
+            event_data=event_data
+        )
+        
+        if success:
+            print(f"✅ Manual review confirmation sent to teacher {email}")
+        else:
+            print(f"❌ Failed to send manual review confirmation to teacher {email}")
+            
+        # Also store in database for backup
+        html_content = f"""
+        <html>
+        <body style="background-color:#1b1b1b; color:white; text-align:center; font-family:'Poppins', sans-serif; padding:40px;">
+            <div style="background:rgba(255,255,255,0.1); border-radius:20px; padding:30px; max-width:500px; margin:auto;">
+                <img src="https://yourcdn.com/learnsphere-logo.png" width="100" alt="LearnSphere Logo"/>
+                <h2 style="margin-top: 20px; color: #fbbf24;">Manual Review Submitted</h2>
+                <p>Hi {teacher_name},</p>
+                <p>Your verification documents have been submitted for manual review by our admin team.</p>
+                <div style="background: rgba(251, 191, 36, 0.2); border-radius: 10px; padding: 15px; margin: 20px 0;">
+                    <p style="margin: 0;">📋 Manual review in progress<br>⏳ Admin approval required</p>
+                </div>
+                <p>You will receive an email notification once your account has been reviewed. This typically takes 1-2 business days.</p>
+                <p style="margin-top:30px; font-size:12px; opacity:0.8;">LearnSphere © 2025</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        email_data = {
+            "recipient_email": email,
+            "subject": "Teacher Verification Submitted - Manual Review",
+            "body": html_content,
+            "notification_type": "teacher_manual_review_teacher"
+        }
+        
+        supabase_admin.table("email_notifications").insert(email_data).execute()
+        
+    except Exception as e:
+        print(f"Failed to send teacher manual review email: {e}")

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import AdminDashboardLayout from '../../layouts/AdminDashboardLayout.jsx';
 import { adminOperations } from '../../utils/supabaseClient.js';
 import { toast } from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users,
   Search,
@@ -36,6 +37,7 @@ import {
 
 const UserManagement = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +51,12 @@ const UserManagement = () => {
   const [viewingUser, setViewingUser] = useState(null);
 
   useEffect(() => {
+    // Read URL parameters and set initial filter
+    const filterParam = searchParams.get('filter');
+    if (filterParam && ['students', 'teachers', 'admins'].includes(filterParam)) {
+      setRoleFilter(filterParam);
+    }
+
     fetchUsers();
 
     // Set up real-time subscription for user updates

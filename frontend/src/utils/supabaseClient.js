@@ -362,60 +362,56 @@ export const adminOperations = {
   async getPendingApprovals() {
     console.log('AdminOperations: Fetching pending approvals...');
 
-    // First, let's check what's in the teacher_approval_requests table
-    const { data: allRequests, error: allError } = await supabase
-      .from('teacher_approval_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      // Get the JWT token from localStorage (set by auth context)
+      const authToken = localStorage.getItem('learnsphere_access_token');
+      if (!authToken) {
+        throw new Error('No authentication token found');
+      }
 
-    console.log('All teacher approval requests:', allRequests);
+      // Use the backend API endpoint
+      const response = await fetch('http://localhost:8000/api/teacher-verification/admin/pending-requests', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    // Try the simplest approach first - just get the requests and manually join
-    const { data: requests, error } = await supabase
-      .from('teacher_approval_requests')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    if (error) {
-      console.error('Error fetching teacher approval requests:', error);
+      const result = await response.json();
+      console.log('Backend API response:', result);
+
+      if (!result.success) {
+        throw new Error(result.detail || 'Failed to fetch pending requests');
+      }
+
+      const pendingTeachers = result.requests || [];
+      console.log('Raw pending teachers from backend:', pendingTeachers);
+
+      // If no pending teachers, return empty array
+      if (!pendingTeachers || pendingTeachers.length === 0) {
+        console.log('No pending teacher approval requests found');
+        return [];
+      }
+
+      // Return the data in the expected format
+      const formattedData = pendingTeachers.map(teacher => ({
+        ...teacher,
+        // Add some additional fields that the UI might expect
+        status: 'pending',
+        teacher_id: teacher.id
+      }));
+
+      console.log('Formatted pending teachers:', formattedData);
+
+      return formattedData;
+    } catch (error) {
+      console.error('Error fetching pending teacher approvals:', error);
       throw error;
     }
-
-    console.log('Raw teacher approval requests:', requests);
-
-    // If no requests, return empty array
-    if (!requests || requests.length === 0) {
-      console.log('No pending teacher approval requests found');
-      return [];
-    }
-
-    // Get profile data for each teacher
-    const teacherIds = requests.map(req => req.teacher_id);
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, created_at')
-      .in('id', teacherIds);
-
-    if (profileError) {
-      console.error('Error fetching teacher profiles:', profileError);
-      throw profileError;
-    }
-
-    console.log('Teacher profiles:', profiles);
-
-    // Combine the data
-    const combinedData = requests.map(request => {
-      const profile = profiles?.find(p => p.id === request.teacher_id);
-      return {
-        ...request,
-        profiles: profile
-      };
-    });
-
-    console.log('Combined approval requests with profiles:', combinedData);
-
-    return combinedData;
   },
 
   // Approve teacher request

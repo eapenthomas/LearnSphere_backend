@@ -45,7 +45,7 @@ git clone https://github.com/your-username/LearnSphere.git
 cd LearnSphere
 
 # Start both backend and frontend with one command
-python start_learnsphere_professional.py
+python scripts/start_learnsphere_professional.py
 ```
 
 ### Option 2: Manual Startup
@@ -183,7 +183,7 @@ All documentation is organized in the `docs/` folder:
 
    ```bash
    # Use the professional startup script
-   python start_learnsphere_professional.py
+   python scripts/start_learnsphere_professional.py
    ```
 
 5. **Access the Application**
@@ -197,10 +197,10 @@ Comprehensive testing guide available in [Testing Guide](docs/TESTING_GUIDE.md):
 
 ```bash
 # Run automated tests
-python run_tests.py
+python scripts/run_tests.py
 
 # Run specific test suites
-python -c "from test_setup import LearnSphereTester; t = LearnSphereTester(); t.setup_driver(); t.test_course_creation(); t.teardown_driver()"
+python -c "from tests.test_setup import LearnSphereTester; t = LearnSphereTester(); t.setup_driver(); t.test_course_creation(); t.teardown_driver()"
 ```
 
 ## 🚀 Deployment

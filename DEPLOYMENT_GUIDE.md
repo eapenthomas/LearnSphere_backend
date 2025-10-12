@@ -1,109 +1,194 @@
-# LearnSphere Deployment Guide
+# 🚀 LearnSphere Deployment Guide
 
-## Complete Step-by-Step Deployment Instructions
+Complete guide for deploying LearnSphere to Render (Backend) and Vercel (Frontend) from scratch.
 
-This guide will walk you through deploying LearnSphere to production using Render (Backend) and Vercel (Frontend).
+## 📋 Prerequisites
 
----
+- GitHub repository with your LearnSphere code
+- Render account (for backend)
+- Vercel account (for frontend)
+- Supabase project setup
+- Domain name (optional, for custom domains)
 
-## Prerequisites
+## 🗂️ Project Structure
 
-### Required Accounts
-
-1. **Render Account** (Free tier available)
-
-   - Sign up at [render.com](https://render.com)
-   - Connect your GitHub account
-
-2. **Vercel Account** (Free tier available)
-
-   - Sign up at [vercel.com](https://vercel.com)
-   - Connect your GitHub account
-
-3. **Supabase Account** (Free tier available)
-
-   - Sign up at [supabase.com](https://supabase.com)
-   - Create a new project
-
-4. **Razorpay Account** (For payments)
-   - Sign up at [razorpay.com](https://razorpay.com)
-   - Complete KYC for live payments
-
-### Required Information
-
-- GitHub repository with LearnSphere code
-- Supabase project URL and keys
-- Razorpay API keys (test/live)
-- OpenAI/DeepSeek API key (for AI features)
-
----
-
-## Part 1: Backend Deployment on Render
-
-### Step 1: Prepare Backend for Production
-
-#### 1.1 Create Production Requirements File
-
-Create `backend/requirements.txt` with all dependencies:
-
-```txt
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-supabase==2.0.0
-python-dotenv==1.0.0
-pydantic==2.5.0
-requests==2.31.0
-razorpay==1.3.0
-openai==1.3.0
-Pillow==10.1.0
-aiofiles==23.2.1
+```
+LearnSphere/
+├── backend/                 # FastAPI backend
+│   ├── main.py             # Entry point
+│   ├── requirements.txt    # Python dependencies
+│   ├── .env.example        # Environment variables template
+│   └── ...
+├── frontend/               # React frontend
+│   ├── package.json        # Node dependencies
+│   ├── vite.config.js      # Vite configuration
+│   ├── .env.example        # Environment variables template
+│   └── ...
+├── database/               # SQL schemas
+├── docs/                   # Documentation
+└── DEPLOYMENT_GUIDE.md     # This file
 ```
 
-#### 1.2 Create Render Configuration
+## 🔧 Environment Variables Setup
 
-Create `backend/render.yaml`:
+### Backend Environment Variables (.env)
 
-```yaml
-services:
-  - type: web
-    name: learnsphere-backend
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: SECRET_KEY
-        generateValue: true
-      - key: RAZORPAY_KEY_ID
-        sync: false
-      - key: RAZORPAY_KEY_SECRET
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: DEEPSEEK_OPENAI_API_KEY
-        sync: false
+Create a `.env` file in the `backend/` directory:
+
+```env
+# Supabase Configuration
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# JWT Configuration
+JWT_SECRET_KEY=your_super_secret_jwt_key_production_ready
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=120
+REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+SUMMARY_API_KEY=your_openai_api_key
+SUMMARY_API_PROVIDER=openai
+SUMMARY_MODEL=gpt-4
+SUMMARY_MAX_INPUT_CHARS=10000
+
+# Email Configuration
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+FROM_EMAIL=your_email@gmail.com
+FROM_NAME=LearnSphere
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Razorpay Payment Configuration
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
 ```
 
-#### 1.3 Update CORS Settings
+### Frontend Environment Variables (.env)
 
-Update `backend/main.py` CORS configuration:
+Create a `.env` file in the `frontend/` directory:
+
+```env
+# Supabase Configuration
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# API Configuration
+VITE_API_URL=https://your-backend-app.onrender.com
+
+# Google OAuth Configuration
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+
+# Razorpay Configuration
+VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
+```
+
+## 🌐 Backend Deployment (Render)
+
+### Step 1: Create Render Account
+
+1. Go to [render.com](https://render.com)
+2. Sign up with GitHub
+3. Connect your GitHub repository
+
+### Step 2: Deploy Backend Service
+
+1. Click "New" → "Web Service"
+2. Connect your GitHub repository
+3. Configure the service:
+
+```
+Name: learnsphere-backend
+Environment: Python 3
+Build Command: cd backend && pip install -r requirements.txt
+Start Command: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+### Step 3: Environment Variables
+
+Add all backend environment variables in Render dashboard:
+
+1. Go to your service → Environment
+2. Add each variable from your `.env` file
+3. Use production values (not local development values)
+
+### Step 4: Advanced Settings
+
+```
+Auto-Deploy: Yes (for automatic deployments on push)
+Health Check Path: /health
+```
+
+### Step 5: Database Setup
+
+1. In Render, create a PostgreSQL database:
+
+   - Click "New" → "PostgreSQL"
+   - Name: `learnsphere-db`
+   - Plan: Free tier (or paid for production)
+
+2. Update your Supabase connection or use Render's PostgreSQL:
+   - Get connection string from Render database
+   - Update `SUPABASE_URL` in environment variables
+
+## ⚡ Frontend Deployment (Vercel)
+
+### Step 1: Create Vercel Account
+
+1. Go to [vercel.com](https://vercel.com)
+2. Sign up with GitHub
+3. Import your GitHub repository
+
+### Step 2: Configure Project
+
+1. Framework Preset: `Vite`
+2. Root Directory: `frontend`
+3. Build Command: `npm run build`
+4. Output Directory: `dist`
+
+### Step 3: Environment Variables
+
+Add all frontend environment variables in Vercel dashboard:
+
+1. Go to your project → Settings → Environment Variables
+2. Add each variable from your frontend `.env` file
+3. Update `VITE_API_URL` to your Render backend URL
+
+### Step 4: Domain Configuration
+
+1. Custom Domain (optional):
+   - Add your domain in Vercel dashboard
+   - Update DNS records as instructed
+   - Update CORS settings in backend
+
+## 🔄 CORS Configuration
+
+Update your backend `main.py` to allow frontend domain:
 
 ```python
-# CORS configuration for production
+from fastapi.middleware.cors import CORSMiddleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://learnsphere-frontend.vercel.app",  # Your Vercel URL
-        "https://your-custom-domain.com"  # Your custom domain
+        "http://localhost:3000",  # Local development
+        "https://your-frontend-domain.vercel.app",  # Vercel
+        "https://your-custom-domain.com",  # Custom domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -111,664 +196,166 @@ app.add_middleware(
 )
 ```
 
-### Step 2: Deploy to Render
+## 📊 Database Setup
 
-#### 2.1 Connect GitHub Repository
+### Option 1: Use Supabase (Recommended)
 
-1. Go to [render.com](https://render.com)
-2. Click **"New +"** → **"Web Service"**
-3. Connect your GitHub account
-4. Select your LearnSphere repository
-5. Choose the repository
+1. Keep using your existing Supabase setup
+2. Ensure all tables are created
+3. Run any pending migrations
 
-#### 2.2 Configure Service Settings
+### Option 2: Use Render PostgreSQL
 
-Fill in the following details:
+1. Connect to Render PostgreSQL
+2. Run your SQL scripts from `database/` folder
+3. Update environment variables
 
-**Basic Settings:**
+## 🔐 Security Checklist
 
-- **Name**: `learnsphere-backend`
-- **Environment**: `Python 3`
-- **Region**: Choose closest to your users
-- **Branch**: `main` (or your main branch)
-- **Root Directory**: `backend`
+### Backend Security
 
-**Build & Deploy:**
+- [ ] Use strong JWT secret key
+- [ ] Set secure CORS origins
+- [ ] Use HTTPS only
+- [ ] Validate all inputs
+- [ ] Rate limiting implemented
+- [ ] Environment variables secured
 
-- **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+### Frontend Security
 
-#### 2.3 Set Environment Variables
+- [ ] No sensitive data in client-side code
+- [ ] Environment variables prefixed with `VITE_`
+- [ ] HTTPS enforced
+- [ ] Content Security Policy headers
 
-Click **"Environment"** tab and add:
+## 🚀 Deployment Commands
 
-```
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-SECRET_KEY=your_jwt_secret_key_here
-RAZORPAY_KEY_ID=rzp_test_your_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_secret
-OPENAI_API_KEY=sk-your_openai_key
-DEEPSEEK_OPENAI_API_KEY=sk-your_deepseek_key
-```
-
-**Important**:
-
-- Use **test keys** for Razorpay initially
-- Generate a strong `SECRET_KEY` (32+ characters)
-- Keep all keys secure
-
-#### 2.4 Deploy
-
-1. Click **"Create Web Service"**
-2. Render will automatically:
-   - Clone your repository
-   - Install dependencies
-   - Build the application
-   - Deploy to a public URL
-
-#### 2.5 Verify Deployment
-
-1. Wait for deployment to complete (5-10 minutes)
-2. Check the **"Logs"** tab for any errors
-3. Visit your service URL (e.g., `https://learnsphere-backend.onrender.com`)
-4. You should see: `{"message": "LearnSphere API is running"}`
-
-#### 2.6 Test API Endpoints
-
-Test a few endpoints:
+### Local Testing
 
 ```bash
-# Health check
-curl https://your-backend-url.onrender.com/
+# Backend
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
 
-# All courses
-curl https://your-backend-url.onrender.com/api/courses/all
-
-# API docs
-curl https://your-backend-url.onrender.com/docs
+# Frontend
+cd frontend
+npm install
+npm run dev
 ```
+
+### Production Deployment
+
+```bash
+# Commit and push to GitHub
+git add .
+git commit -m "Deploy to production"
+git push origin main
+
+# Both Render and Vercel will auto-deploy
+```
+
+## 📈 Monitoring & Maintenance
+
+### Render Monitoring
+
+1. Check service logs regularly
+2. Monitor resource usage
+3. Set up uptime monitoring
+4. Configure alerts
+
+### Vercel Monitoring
+
+1. Monitor build logs
+2. Check function execution logs
+3. Monitor performance metrics
+4. Set up error tracking
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Backend Issues
+
+- **Build fails**: Check `requirements.txt` and Python version
+- **Environment variables**: Ensure all required vars are set
+- **Database connection**: Verify connection strings
+- **CORS errors**: Update allowed origins
+
+#### Frontend Issues
+
+- **Build fails**: Check `package.json` dependencies
+- **API calls fail**: Verify `VITE_API_URL` is correct
+- **Environment variables**: Ensure `VITE_` prefix is used
+- **Routing issues**: Check Vercel configuration
+
+#### Database Issues
+
+- **Connection timeout**: Check database credentials
+- **Missing tables**: Run SQL scripts from `database/` folder
+- **Migration errors**: Check SQL syntax
+
+### Debug Commands
+
+```bash
+# Check backend logs
+render logs your-service-name
+
+# Check frontend build logs
+vercel logs your-deployment-url
+
+# Test API endpoints
+curl https://your-backend.onrender.com/health
+
+# Test frontend
+curl https://your-frontend.vercel.app
+```
+
+## 📞 Support
+
+### Render Support
+
+- Documentation: [render.com/docs](https://render.com/docs)
+- Community: [community.render.com](https://community.render.com)
+
+### Vercel Support
+
+- Documentation: [vercel.com/docs](https://vercel.com/docs)
+- Community: [github.com/vercel/vercel/discussions](https://github.com/vercel/vercel/discussions)
+
+### LearnSphere Support
+
+- GitHub Issues: Create issues in your repository
+- Documentation: Check `docs/` folder
+
+## 🎯 Post-Deployment Checklist
+
+- [ ] Backend service is running and healthy
+- [ ] Frontend is accessible and loading
+- [ ] Database connection is working
+- [ ] Authentication is functional
+- [ ] Email notifications are working
+- [ ] Payment integration is tested
+- [ ] Admin dashboard is accessible
+- [ ] All API endpoints are responding
+- [ ] CORS is properly configured
+- [ ] Environment variables are secure
+- [ ] Custom domains are working (if applicable)
+- [ ] SSL certificates are active
+- [ ] Monitoring is set up
+- [ ] Backup strategy is in place
+
+## 📝 Notes
+
+- **Free Tier Limits**: Both Render and Vercel have free tier limitations
+- **Auto-Deploy**: Both platforms auto-deploy on GitHub push
+- **Environment Variables**: Never commit `.env` files to Git
+- **Database**: Consider upgrading to paid plans for production
+- **Monitoring**: Set up proper monitoring for production use
+- **Backup**: Regular database backups are essential
 
 ---
 
-## Part 2: Frontend Deployment on Vercel
+**Happy Deploying! 🚀**
 
-### Step 1: Prepare Frontend for Production
-
-#### 1.1 Create Vercel Configuration
-
-Create `frontend/vercel.json`:
-
-```json
-{
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "env": {
-    "VITE_SUPABASE_URL": "@supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "VITE_API_URL": "@api_url",
-    "VITE_RAZORPAY_KEY_ID": "@razorpay_key_id"
-  }
-}
-```
-
-#### 1.2 Update Environment Variables
-
-Create `frontend/.env.production`:
-
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_URL=https://your-backend-url.onrender.com
-VITE_RAZORPAY_KEY_ID=rzp_test_your_key_id
-```
-
-#### 1.3 Update API Base URL
-
-Update `frontend/src/config/api.js` (if exists) or create it:
-
-```javascript
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-export const apiConfig = {
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-};
-
-export default apiConfig;
-```
-
-#### 1.4 Update Axios Configuration
-
-Update all API calls to use the environment variable:
-
-```javascript
-// In your API files
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-// Example usage
-const response = await axios.get(`${API_URL}/api/courses/all`);
-```
-
-### Step 2: Deploy to Vercel
-
-#### 2.1 Connect GitHub Repository
-
-1. Go to [vercel.com](https://vercel.com)
-2. Click **"New Project"**
-3. Import your GitHub repository
-4. Select your LearnSphere repository
-
-#### 2.2 Configure Project Settings
-
-Fill in the following:
-
-**Project Settings:**
-
-- **Project Name**: `learnsphere-frontend`
-- **Framework Preset**: `Vite`
-- **Root Directory**: `frontend`
-- **Build Command**: `npm run build`
-- **Output Directory**: `dist`
-- **Install Command**: `npm install`
-
-#### 2.3 Set Environment Variables
-
-In the **"Environment Variables"** section, add:
-
-```
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_URL=https://your-backend-url.onrender.com
-VITE_RAZORPAY_KEY_ID=rzp_test_your_key_id
-```
-
-#### 2.4 Deploy
-
-1. Click **"Deploy"**
-2. Vercel will:
-   - Install dependencies
-   - Build the React app
-   - Deploy to a public URL
-   - Provide you with a URL like `https://learnsphere-frontend.vercel.app`
-
-#### 2.5 Verify Deployment
-
-1. Wait for deployment to complete (3-5 minutes)
-2. Visit your Vercel URL
-3. Test the application:
-   - Try logging in
-   - Browse courses
-   - Test file uploads
-   - Check if thumbnails display
-
----
-
-## Part 3: Database Setup (Supabase)
-
-### Step 1: Production Database Configuration
-
-#### 1.1 Create Production Supabase Project
-
-1. Go to [supabase.com](https://supabase.com)
-2. Click **"New Project"**
-3. Choose organization
-4. Enter project details:
-   - **Name**: `learnsphere-production`
-   - **Database Password**: Generate strong password
-   - **Region**: Choose closest to your users
-
-#### 1.2 Run Database Migrations
-
-Execute all SQL files in your `database/` folder:
-
-1. **Core Schema**:
-
-```sql
--- Run all files in order:
--- 1. profiles_schema.sql
--- 2. courses_schema.sql
--- 3. enrollments_schema.sql
--- 4. course_materials_schema.sql
--- 5. assignments_schema.sql
--- 6. quizzes_schema.sql
--- 7. forum_schema.sql
--- 8. notifications_schema.sql
--- 9. payments_schema.sql
--- 10. indexes.sql
-```
-
-#### 1.3 Configure Row Level Security (RLS)
-
-Enable RLS on all tables and create policies:
-
-```sql
--- Enable RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
--- ... (repeat for all tables)
-
--- Create policies (example for profiles)
-CREATE POLICY "Users can view own profile" ON profiles
-    FOR SELECT USING (auth.uid()::text = id);
-
-CREATE POLICY "Users can update own profile" ON profiles
-    FOR UPDATE USING (auth.uid()::text = id);
-```
-
-#### 1.4 Set Up Storage Buckets
-
-Create storage buckets in Supabase Dashboard:
-
-1. Go to **Storage** → **Buckets**
-2. Create these buckets:
-
-   - `course-materials` (Public)
-   - `course-thumbnails` (Public)
-   - `profile-pictures` (Public)
-   - `assignments` (Public)
-   - `teacher-verifications` (Private)
-
-3. Set bucket policies:
-
-```sql
--- Example for course-thumbnails
-CREATE POLICY "Anyone can view thumbnails" ON storage.objects
-    FOR SELECT USING (bucket_id = 'course-thumbnails');
-
-CREATE POLICY "Authenticated users can upload thumbnails" ON storage.objects
-    FOR INSERT WITH CHECK (bucket_id = 'course-thumbnails' AND auth.role() = 'authenticated');
-```
-
-### Step 2: Authentication Setup
-
-#### 2.1 Configure Auth Settings
-
-In Supabase Dashboard → **Authentication** → **Settings**:
-
-- **Site URL**: `https://your-frontend-url.vercel.app`
-- **Redirect URLs**:
-  - `https://your-frontend-url.vercel.app/auth/callback`
-  - `https://your-frontend-url.vercel.app/dashboard`
-
-#### 2.2 Set Up Email Templates
-
-Configure email templates for:
-
-- Email confirmation
-- Password reset
-- Magic link
-
----
-
-## Part 4: Payment Setup (Razorpay)
-
-### Step 1: Production Razorpay Configuration
-
-#### 1.1 Complete KYC
-
-1. Log in to Razorpay Dashboard
-2. Complete KYC verification:
-   - Business details
-   - PAN card
-   - Bank account details
-   - GST information
-   - Director/Owner documents
-
-#### 1.2 Get Live API Keys
-
-1. Switch to **Live Mode**
-2. Go to **Settings** → **API Keys**
-3. Generate **Live Key**
-4. Copy:
-   - **Key ID** (starts with `rzp_live_`)
-   - **Key Secret**
-
-#### 1.3 Update Environment Variables
-
-Update your Render environment variables:
-
-```
-RAZORPAY_KEY_ID=rzp_live_your_live_key_id
-RAZORPAY_KEY_SECRET=your_live_secret
-```
-
-#### 1.4 Configure Webhooks
-
-1. Go to **Settings** → **Webhooks**
-2. Add webhook URL: `https://your-backend-url.onrender.com/api/payment/webhook`
-3. Select events:
-   - `payment.authorized`
-   - `payment.captured`
-   - `payment.failed`
-   - `order.paid`
-
----
-
-## Part 5: Custom Domain Setup (Optional)
-
-### Step 1: Backend Custom Domain (Render)
-
-#### 1.1 Add Custom Domain
-
-1. Go to your Render service
-2. Click **"Settings"** → **"Custom Domains"**
-3. Add your domain: `api.yourdomain.com`
-4. Configure DNS:
-   - Add CNAME record: `api` → `your-service.onrender.com`
-
-#### 1.2 Update CORS
-
-Update backend CORS to include your domain:
-
-```python
-allow_origins=[
-    "https://yourdomain.com",
-    "https://www.yourdomain.com",
-    "https://your-frontend-url.vercel.app"
-]
-```
-
-### Step 2: Frontend Custom Domain (Vercel)
-
-#### 2.1 Add Custom Domain
-
-1. Go to your Vercel project
-2. Click **"Settings"** → **"Domains"**
-3. Add your domain: `yourdomain.com`
-4. Configure DNS:
-   - Add A record: `@` → `76.76.19.61`
-   - Add CNAME record: `www` → `cname.vercel-dns.com`
-
-#### 2.2 Update Environment Variables
-
-Update frontend environment:
-
-```
-VITE_API_URL=https://api.yourdomain.com
-```
-
----
-
-## Part 6: Monitoring & Maintenance
-
-### Step 1: Set Up Monitoring
-
-#### 1.1 Render Monitoring
-
-- Monitor service health in Render dashboard
-- Set up uptime monitoring
-- Monitor resource usage
-
-#### 1.2 Vercel Analytics
-
-- Enable Vercel Analytics
-- Monitor Core Web Vitals
-- Track user interactions
-
-#### 1.3 Error Tracking
-
-Add Sentry for error tracking:
-
-1. Sign up at [sentry.io](https://sentry.io)
-2. Create project for LearnSphere
-3. Add to both frontend and backend
-4. Monitor errors and performance
-
-### Step 2: Backup Strategy
-
-#### 2.1 Database Backups
-
-- Supabase automatically backs up daily
-- Export data regularly
-- Test restore procedures
-
-#### 2.2 Code Backups
-
-- Use Git for version control
-- Tag releases
-- Keep deployment logs
-
----
-
-## Part 7: Testing Production Deployment
-
-### Step 1: Comprehensive Testing
-
-#### 1.1 Authentication Flow
-
-- [ ] User registration works
-- [ ] Email verification works
-- [ ] Login/logout works
-- [ ] Password reset works
-- [ ] Session persistence works
-
-#### 1.2 Course Management
-
-- [ ] Teacher can create courses
-- [ ] Thumbnail upload works
-- [ ] Course materials upload works
-- [ ] Students can enroll
-- [ ] Payment integration works
-
-#### 1.3 File Uploads
-
-- [ ] Course materials (PDF, DOCX)
-- [ ] Assignment files
-- [ ] Profile pictures
-- [ ] Course thumbnails
-- [ ] File size validation works
-
-#### 1.4 AI Features
-
-- [ ] AI quiz generation works
-- [ ] AI tutor responds
-- [ ] Notes summarizer works
-- [ ] API keys are configured
-
-### Step 2: Performance Testing
-
-#### 2.1 Load Testing
-
-- Test with multiple concurrent users
-- Monitor response times
-- Check database performance
-- Verify file upload limits
-
-#### 2.2 Mobile Testing
-
-- Test on different devices
-- Check responsive design
-- Verify touch interactions
-- Test mobile file uploads
-
----
-
-## Troubleshooting Common Issues
-
-### Backend Issues
-
-#### Issue: Service Won't Start
-
-**Solution**:
-
-- Check logs in Render dashboard
-- Verify all environment variables
-- Check Python version compatibility
-- Ensure all dependencies are in requirements.txt
-
-#### Issue: Database Connection Failed
-
-**Solution**:
-
-- Verify Supabase URL and keys
-- Check network connectivity
-- Verify database is running
-- Check RLS policies
-
-#### Issue: File Upload Fails
-
-**Solution**:
-
-- Check Supabase Storage configuration
-- Verify bucket policies
-- Check file size limits
-- Verify CORS settings
-
-### Frontend Issues
-
-#### Issue: API Calls Fail
-
-**Solution**:
-
-- Check CORS configuration
-- Verify API URL in environment
-- Check network tab for errors
-- Verify authentication tokens
-
-#### Issue: Images Don't Load
-
-**Solution**:
-
-- Check Supabase Storage policies
-- Verify image URLs
-- Check CORS for images
-- Verify bucket is public
-
-#### Issue: Build Fails
-
-**Solution**:
-
-- Check Node.js version
-- Verify all dependencies
-- Check for TypeScript errors
-- Review build logs
-
----
-
-## Production Checklist
-
-### Pre-Deployment
-
-- [ ] All tests pass locally
-- [ ] Environment variables configured
-- [ ] Database migrations run
-- [ ] Storage buckets created
-- [ ] Payment gateway configured
-- [ ] SSL certificates active
-- [ ] Custom domains configured
-- [ ] Monitoring set up
-
-### Post-Deployment
-
-- [ ] All features tested
-- [ ] Performance verified
-- [ ] Security scan completed
-- [ ] Backup strategy implemented
-- [ ] Documentation updated
-- [ ] Team access configured
-- [ ] Support process defined
-
----
-
-## Cost Estimation
-
-### Free Tier Limits
-
-- **Render**: 750 hours/month (free tier)
-- **Vercel**: 100GB bandwidth/month
-- **Supabase**: 500MB database, 1GB storage
-- **Razorpay**: 2% transaction fee
-
-### Scaling Costs
-
-- **Render**: $7/month for always-on
-- **Vercel Pro**: $20/month for unlimited
-- **Supabase Pro**: $25/month for more resources
-- **Custom Domain**: $10-15/year
-
----
-
-## Security Best Practices
-
-### Environment Variables
-
-- Never commit secrets to Git
-- Use different keys for test/production
-- Rotate keys regularly
-- Use strong passwords
-
-### Database Security
-
-- Enable RLS on all tables
-- Use least privilege principle
-- Regular security audits
-- Monitor access logs
-
-### API Security
-
-- Rate limiting implemented
-- Input validation
-- SQL injection prevention
-- XSS protection
-
----
-
-## Support & Maintenance
-
-### Regular Tasks
-
-- Monitor service health
-- Update dependencies
-- Review security logs
-- Backup data
-- Performance optimization
-
-### Emergency Procedures
-
-- Service outage response
-- Data recovery process
-- Security incident response
-- Rollback procedures
-
----
-
-## Conclusion
-
-Your LearnSphere application is now deployed to production!
-
-**Backend**: `https://your-backend-url.onrender.com`
-**Frontend**: `https://your-frontend-url.vercel.app`
-**Database**: Supabase Production
-**Payments**: Razorpay Live Mode
-
-### Next Steps:
-
-1. Test all features thoroughly
-2. Set up monitoring and alerts
-3. Configure backups
-4. Plan for scaling
-5. Gather user feedback
-6. Iterate and improve
-
-**Congratulations! Your Learning Management System is live! 🚀**
+For questions or issues, please refer to the troubleshooting section or create an issue in your GitHub repository.

@@ -15,11 +15,17 @@ supabase_url = os.getenv("SUPABASE_URL")
 supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
 supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-if not supabase_url or not supabase_anon_key or not supabase_service_key:
+if not supabase_url or not supabase_anon_key:
     raise ValueError("Missing Supabase configuration")
 
 supabase: Client = create_client(supabase_url, supabase_anon_key)
-supabase_admin: Client = create_client(supabase_url, supabase_service_key)
+
+# Use anon key for admin operations if service role key is not available
+if supabase_service_key:
+    supabase_admin: Client = create_client(supabase_url, supabase_service_key)
+else:
+    print("⚠️  Service role key not found, using anon key for admin operations")
+    supabase_admin: Client = create_client(supabase_url, supabase_anon_key)
 
 
 class AuthService:

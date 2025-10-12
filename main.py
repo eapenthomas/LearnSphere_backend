@@ -169,6 +169,204 @@ async def startup_event():
 async def health_check():
     return {"status": "healthy", "message": "LearnSphere API is running"}
 
+# Simple auth endpoints for testing
+@app.post("/api/auth/login")
+async def simple_login(request: dict):
+    """Simple login endpoint for testing"""
+    try:
+        email = request.get("email", "")
+        password = request.get("password", "")
+        
+        if email == "admin@learnsphere.com" and password == "admin123":
+            return {
+                "success": True,
+                "message": "Login successful",
+                "user": {
+                    "id": "admin-001",
+                    "email": "admin@learnsphere.com",
+                    "role": "admin",
+                    "full_name": "System Administrator"
+                },
+                "token": "test-admin-token"
+            }
+        elif email == "teacher@learnsphere.com" and password == "teacher123":
+            return {
+                "success": True,
+                "message": "Login successful",
+                "user": {
+                    "id": "teacher-001",
+                    "email": "teacher@learnsphere.com",
+                    "role": "teacher",
+                    "full_name": "Test Teacher"
+                },
+                "token": "test-teacher-token"
+            }
+        elif email == "student@learnsphere.com" and password == "student123":
+            return {
+                "success": True,
+                "message": "Login successful",
+                "user": {
+                    "id": "student-001",
+                    "email": "student@learnsphere.com",
+                    "role": "student",
+                    "full_name": "Test Student"
+                },
+                "token": "test-student-token"
+            }
+        else:
+            return {"success": False, "message": "Invalid credentials"}
+    except Exception as e:
+        return {"success": False, "message": f"Error: {str(e)}"}
+
+@app.post("/api/auth/register")
+async def simple_register(request: dict):
+    """Simple register endpoint for testing"""
+    try:
+        email = request.get("email", "")
+        password = request.get("password", "")
+        full_name = request.get("full_name", "")
+        role = request.get("role", "student")
+        
+        # Simulate successful registration
+        user_id = f"user-{hash(email) % 10000}"
+        
+        return {
+            "success": True,
+            "message": "Registration successful",
+            "user": {
+                "id": user_id,
+                "email": email,
+                "role": role,
+                "full_name": full_name,
+                "approval_status": "approved" if role == "student" else "pending"
+            },
+            "token": f"test-token-{user_id}"
+        }
+    except Exception as e:
+        return {"success": False, "message": f"Error: {str(e)}"}
+
+@app.post("/api/auth/check-email")
+async def check_email(request: dict):
+    """Check if email exists"""
+    try:
+        email = request.get("email", "")
+        
+        # Test emails that exist
+        existing_emails = [
+            "admin@learnsphere.com",
+            "teacher@learnsphere.com", 
+            "student@learnsphere.com",
+            "john@example.com",
+            "jane@example.com"
+        ]
+        
+        exists = email in existing_emails
+        
+        return {
+            "exists": exists,
+            "message": "Email exists" if exists else "Email available"
+        }
+    except Exception as e:
+        return {"exists": False, "message": f"Error: {str(e)}"}
+
+# Test data endpoints
+@app.get("/api/test/courses")
+async def get_test_courses():
+    """Get test courses"""
+    return {
+        "courses": [
+            {
+                "id": "course-001",
+                "title": "Introduction to Python Programming",
+                "description": "Learn Python from basics to advanced concepts",
+                "instructor": "Dr. Smith",
+                "duration": "8 weeks",
+                "price": 99.99,
+                "category": "Programming",
+                "level": "Beginner",
+                "enrollment_count": 156,
+                "rating": 4.8,
+                "thumbnail": "/api/thumbnails/python-course.jpg"
+            },
+            {
+                "id": "course-002", 
+                "title": "Machine Learning Fundamentals",
+                "description": "Comprehensive guide to ML algorithms and applications",
+                "instructor": "Dr. Johnson",
+                "duration": "12 weeks",
+                "price": 199.99,
+                "category": "Data Science",
+                "level": "Intermediate",
+                "enrollment_count": 89,
+                "rating": 4.9,
+                "thumbnail": "/api/thumbnails/ml-course.jpg"
+            },
+            {
+                "id": "course-003",
+                "title": "Web Development with React",
+                "description": "Build modern web applications with React",
+                "instructor": "Sarah Wilson",
+                "duration": "10 weeks", 
+                "price": 149.99,
+                "category": "Web Development",
+                "level": "Intermediate",
+                "enrollment_count": 234,
+                "rating": 4.7,
+                "thumbnail": "/api/thumbnails/react-course.jpg"
+            }
+        ]
+    }
+
+@app.get("/api/test/ai-tutor")
+async def ai_tutor_response(request: dict = None):
+    """AI Tutor response for testing"""
+    return {
+        "response": "Hello! I'm your AI tutor. I can help you with:\n\n• Explaining concepts\n• Solving problems\n• Providing examples\n• Answering questions\n\nWhat would you like to learn about today?",
+        "suggestions": [
+            "Explain Python variables",
+            "Help with this math problem",
+            "Show me examples of React components",
+            "What is machine learning?"
+        ]
+    }
+
+@app.post("/api/test/quiz-generate")
+async def generate_test_quiz(request: dict):
+    """Generate test quiz"""
+    topic = request.get("topic", "Python Programming")
+    
+    return {
+        "quiz": {
+            "id": "quiz-001",
+            "title": f"Quiz: {topic}",
+            "questions": [
+                {
+                    "id": "q1",
+                    "question": "What is Python?",
+                    "options": [
+                        "A programming language",
+                        "A type of snake", 
+                        "A database",
+                        "An operating system"
+                    ],
+                    "correct_answer": 0
+                },
+                {
+                    "id": "q2", 
+                    "question": "Which keyword is used to define a function in Python?",
+                    "options": [
+                        "function",
+                        "def",
+                        "define",
+                        "func"
+                    ],
+                    "correct_answer": 1
+                }
+            ],
+            "duration": 30
+        }
+    }
+
 # Root endpoint
 @app.get("/")
 async def root():

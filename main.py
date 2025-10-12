@@ -118,14 +118,61 @@ try:
     except ImportError as e:
         print(f"⚠️  Notes router failed to import: {e}")
         notes_router = None
-    from forum_api import router as forum_router
-    from student_deadlines_api import router as student_deadlines_router
-    from course_progress_api import router as progress_router
-    from quiz_generator_api import router as quiz_generator_router
-    from activity_export_api import router as activity_export_router
-    from user_management_api import router as user_management_router
-    from teacher_verification_enhanced import router as teacher_verification_router
-    from payment_system_enhanced import router as payment_router
+    try:
+        from forum_api import router as forum_router
+        print("✅ Forum router imported")
+    except ImportError as e:
+        print(f"⚠️  Forum router failed to import: {e}")
+        forum_router = None
+
+    try:
+        from student_deadlines_api import router as student_deadlines_router
+        print("✅ Student deadlines router imported")
+    except ImportError as e:
+        print(f"⚠️  Student deadlines router failed to import: {e}")
+        student_deadlines_router = None
+
+    try:
+        from course_progress_api import router as progress_router
+        print("✅ Course progress router imported")
+    except ImportError as e:
+        print(f"⚠️  Course progress router failed to import: {e}")
+        progress_router = None
+
+    try:
+        from quiz_generator_api import router as quiz_generator_router
+        print("✅ Quiz generator router imported")
+    except ImportError as e:
+        print(f"⚠️  Quiz generator router failed to import: {e}")
+        quiz_generator_router = None
+
+    try:
+        from activity_export_api import router as activity_export_router
+        print("✅ Activity export router imported")
+    except ImportError as e:
+        print(f"⚠️  Activity export router failed to import: {e}")
+        activity_export_router = None
+
+    try:
+        from user_management_api import router as user_management_router
+        print("✅ User management router imported")
+    except ImportError as e:
+        print(f"⚠️  User management router failed to import: {e}")
+        user_management_router = None
+
+    try:
+        from teacher_verification_enhanced import router as teacher_verification_router
+        print("✅ Teacher verification router imported")
+    except ImportError as e:
+        print(f"⚠️  Teacher verification router failed to import: {e}")
+        teacher_verification_router = None
+
+    try:
+        from payment_system_enhanced import router as payment_router
+        print("✅ Payment router imported")
+    except ImportError as e:
+        print(f"⚠️  Payment router failed to import: {e}")
+        payment_router = None
     
     # Include routers in optimized order (most used first)
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -155,14 +202,23 @@ try:
         app.include_router(ai_tutor_router)
     if notes_router:
         app.include_router(notes_router)
-    app.include_router(forum_router)
-    app.include_router(student_deadlines_router)
-    app.include_router(progress_router)
-    app.include_router(quiz_generator_router)
-    app.include_router(activity_export_router)
-    app.include_router(user_management_router)
-    app.include_router(teacher_verification_router)
-    app.include_router(payment_router)
+    # Include optional routers only if they were imported successfully
+    if forum_router:
+        app.include_router(forum_router)
+    if student_deadlines_router:
+        app.include_router(student_deadlines_router)
+    if progress_router:
+        app.include_router(progress_router)
+    if quiz_generator_router:
+        app.include_router(quiz_generator_router)
+    if activity_export_router:
+        app.include_router(activity_export_router)
+    if user_management_router:
+        app.include_router(user_management_router)
+    if teacher_verification_router:
+        app.include_router(teacher_verification_router)
+    if payment_router:
+        app.include_router(payment_router)
     
     print("✅ All modules loaded successfully")
     

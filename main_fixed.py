@@ -71,9 +71,7 @@ try:
     print("🚀 Loading LearnSphere modules...")
     
     # Import routers in order of importance (most used first)
-    print("📦 Importing auth router...")
     from auth import router as auth_router
-    print(f"✅ Auth router imported: {auth_router}")
     from auth_refresh_api import router as auth_refresh_router
     from notification_api import router as notification_router
     from notifications_api_enhanced import router as notifications_enhanced_router
@@ -97,27 +95,10 @@ try:
     from teacher_reports_api import router as teacher_reports_router
     from teacher_rating_api import router as teacher_rating_router
     
-    # Import other routers (with error handling for optional dependencies)
-    try:
-        from ai_usage_api import router as ai_usage_router
-        print("✅ AI usage router imported")
-    except ImportError as e:
-        print(f"⚠️  AI usage router failed to import: {e}")
-        ai_usage_router = None
-
-    try:
-        from ai_tutor_api import router as ai_tutor_router
-        print("✅ AI tutor router imported")
-    except ImportError as e:
-        print(f"⚠️  AI tutor router failed to import: {e}")
-        ai_tutor_router = None
-
-    try:
-        from notes_summarizer_api import router as notes_router
-        print("✅ Notes router imported")
-    except ImportError as e:
-        print(f"⚠️  Notes router failed to import: {e}")
-        notes_router = None
+    # Import other routers
+    from ai_usage_api import router as ai_usage_router
+    from ai_tutor_api import router as ai_tutor_router
+    from notes_summarizer_api import router as notes_router
     from forum_api import router as forum_router
     from student_deadlines_api import router as student_deadlines_router
     from course_progress_api import router as progress_router
@@ -147,14 +128,9 @@ try:
     app.include_router(teacher_analytics_router)
     app.include_router(teacher_reports_router)
     app.include_router(teacher_rating_router)
-    
-    # Include optional routers only if they were imported successfully
-    if ai_usage_router:
-        app.include_router(ai_usage_router)
-    if ai_tutor_router:
-        app.include_router(ai_tutor_router)
-    if notes_router:
-        app.include_router(notes_router)
+    app.include_router(ai_usage_router)
+    app.include_router(ai_tutor_router)
+    app.include_router(notes_router)
     app.include_router(forum_router)
     app.include_router(student_deadlines_router)
     app.include_router(progress_router)
@@ -176,16 +152,6 @@ except Exception as e:
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "message": "LearnSphere API is running"}
-
-# Test endpoint to verify app is working
-@app.get("/test")
-async def test_endpoint():
-    return {"message": "Test endpoint working", "timestamp": "2025-01-12"}
-
-# Simple login test endpoint
-@app.post("/api/test-login")
-async def test_login():
-    return {"message": "Test login endpoint working"}
 
 # Root endpoint
 @app.get("/")

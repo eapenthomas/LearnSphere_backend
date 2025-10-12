@@ -11,7 +11,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder_key'
+  supabaseAnonKey || 'placeholder_key',
+  {
+    auth: {
+      storageKey: 'learnsphere-auth',
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  }
 );
 
 // Function to set authentication token

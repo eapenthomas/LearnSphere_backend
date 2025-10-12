@@ -15,10 +15,30 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Dynamic CORS origins function
+def get_allowed_origins():
+    """Get allowed CORS origins including environment-specific URLs"""
+    origins = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        # Vercel frontend URLs
+        "https://learn-sphere-frontend-black.vercel.app",
+        "https://learn-sphere-frontend-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-git-main-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-grfp9yq65-eapenthomas-projects.vercel.app",
+    ]
+    
+    # Add any additional origins from environment variables
+    additional_origins = os.environ.get('ADDITIONAL_CORS_ORIGINS', '')
+    if additional_origins:
+        origins.extend(additional_origins.split(','))
+    
+    return origins
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

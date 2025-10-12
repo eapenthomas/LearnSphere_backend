@@ -21,8 +21,16 @@ if not supabase_url or not supabase_anon_key:
 supabase: Client = create_client(supabase_url, supabase_anon_key)
 
 # Use anon key for admin operations if service role key is not available
-if supabase_service_key:
-    supabase_admin: Client = create_client(supabase_url, supabase_service_key)
+if supabase_service_key and not supabase_service_key.startswith("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"):
+    print("⚠️  Service role key appears invalid, using anon key for admin operations")
+    supabase_admin: Client = create_client(supabase_url, supabase_anon_key)
+elif supabase_service_key:
+    try:
+        supabase_admin: Client = create_client(supabase_url, supabase_service_key)
+        print("✅ Using service role key for admin operations")
+    except Exception as e:
+        print(f"⚠️  Service role key failed, using anon key: {e}")
+        supabase_admin: Client = create_client(supabase_url, supabase_anon_key)
 else:
     print("⚠️  Service role key not found, using anon key for admin operations")
     supabase_admin: Client = create_client(supabase_url, supabase_anon_key)

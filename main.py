@@ -71,7 +71,9 @@ try:
     print("🚀 Loading LearnSphere modules...")
     
     # Import routers in order of importance (most used first)
+    print("📦 Importing auth router...")
     from auth import router as auth_router
+    print(f"✅ Auth router imported: {auth_router}")
     from auth_refresh_api import router as auth_refresh_router
     from notification_api import router as notification_router
     from notifications_api_enhanced import router as notifications_enhanced_router
@@ -152,6 +154,16 @@ except Exception as e:
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "message": "LearnSphere API is running"}
+
+# Test endpoint to verify app is working
+@app.get("/test")
+async def test_endpoint():
+    return {"message": "Test endpoint working", "timestamp": "2025-01-12"}
+
+# Simple login test endpoint
+@app.post("/api/test-login")
+async def test_login():
+    return {"message": "Test login endpoint working"}
 
 # Root endpoint
 @app.get("/")

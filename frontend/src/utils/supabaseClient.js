@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getApiUrl, API_ENDPOINTS } from './apiConfig.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -185,7 +186,7 @@ export const courseOperations = {
       const formData = new FormData();
       formData.append('thumbnail', file);
 
-      const response = await fetch(`http://localhost:8000/api/courses/${courseId}/thumbnail`, {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.COURSES.THUMBNAIL(courseId)), {
         method: 'PUT',
         body: formData
       });
@@ -370,7 +371,7 @@ export const adminOperations = {
       }
 
       // Use the backend API endpoint
-      const response = await fetch('http://localhost:8000/api/teacher-verification/admin/pending-requests', {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.TEACHER_VERIFICATION.PENDING_REQUESTS), {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
@@ -421,7 +422,7 @@ export const adminOperations = {
     try {
       // Use backend admin API for proper permissions
       console.log('AdminOperations - Making API call to backend...');
-      const response = await fetch('http://localhost:8000/api/admin/approve-teacher', {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.ADMIN.APPROVE_TEACHER), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -499,7 +500,7 @@ export const adminOperations = {
     console.log('Rejecting teacher:', { requestId, teacherId, adminId, reason });
 
     // Use backend admin API for proper permissions
-    const response = await fetch('http://localhost:8000/api/admin/reject-teacher', {
+    const response = await fetch(getApiUrl(API_ENDPOINTS.ADMIN.REJECT_TEACHER), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -584,7 +585,7 @@ export const adminOperations = {
     console.log('Toggling user status:', { userId, isActive, adminId });
 
     // Use backend admin API for proper permissions
-    const response = await fetch('http://localhost:8000/api/admin/toggle-user-status', {
+    const response = await fetch(getApiUrl(API_ENDPOINTS.ADMIN.TOGGLE_USER_STATUS), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

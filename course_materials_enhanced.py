@@ -93,8 +93,15 @@ def upload_file_to_supabase(file: UploadFile, course_id: str, folder: str = "mat
             file_options={"content-type": file.content_type or "application/octet-stream"}
         )
         
-        if result.get('error'):
-            raise Exception(f"Upload failed: {result['error']}")
+        # Check for upload errors - handle different response structures
+        try:
+            # Try to access as dict first
+            if isinstance(result, dict) and result.get('error'):
+                raise Exception(f"Upload failed: {result['error']}")
+        except AttributeError:
+            # If not a dict, try to access as object
+            if hasattr(result, 'error') and result.error:
+                raise Exception(f"Upload failed: {result.error}")
         
         # Get public URL
         public_url = supabase.storage.from_("course-materials").get_public_url(file_path)

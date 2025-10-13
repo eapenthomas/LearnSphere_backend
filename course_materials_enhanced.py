@@ -156,6 +156,11 @@ async def upload_single_file(
         if not course_response.data:
             raise HTTPException(status_code=404, detail="Course not found or you don't have permission to upload to this course")
 
+        # Check file size (limit to 49MB)
+        file_size = get_file_size(file)
+        if file_size > 49 * 1024 * 1024:  # 49MB
+            raise HTTPException(status_code=413, detail="File too large (max 49MB)")
+
         # Upload file to Supabase storage
         upload_result = upload_file_to_supabase(file, course_id)
         
@@ -167,7 +172,7 @@ async def upload_single_file(
             "course_id": course_id,
             "file_name": file.filename,
             "file_url": upload_result["public_url"],
-            "file_size": upload_result["file_size"],
+            "file_size": file_size,
             "file_type": file.content_type,
             "uploaded_by": current_user.user_id,
             "description": description,
@@ -225,10 +230,10 @@ async def upload_multiple_files(
                     failed_files.append({"filename": file.filename, "error": "File type not allowed"})
                     continue
                 
-                # Check file size (limit to 50MB)
+                # Check file size (limit to 49MB)
                 file_size = get_file_size(file)
-                if file_size > 50 * 1024 * 1024:  # 50MB
-                    failed_files.append({"filename": file.filename, "error": "File too large (max 50MB)"})
+                if file_size > 49 * 1024 * 1024:  # 49MB
+                    failed_files.append({"filename": file.filename, "error": "File too large (max 49MB)"})
                     continue
                 
                 # Upload file

@@ -318,6 +318,12 @@ async def create_test_teacher():
             else:
                 auth_user_id = str(uuid.uuid4())
         
+        # Create custom password hash for direct login
+        import hashlib
+        import secrets
+        
+        salt, hashed_password = AuthService.hash_password(password)
+        
         # Create or update profile
         teacher_data = {
             "id": auth_user_id,  # Use same ID as auth user
@@ -330,7 +336,10 @@ async def create_test_teacher():
             "is_verified": True,
             "ocr_status": "verified",
             "ai_confidence": 95,
-            "verification_reason": "Test teacher for testing purposes"
+            "verification_reason": "Test teacher for testing purposes",
+            # Add custom password fields for direct login
+            "password_salt": salt,
+            "password_hash": hashed_password
         }
         
         if existing_profile.data:

@@ -325,18 +325,22 @@ async def get_course_materials(
     """Get all materials for a course"""
     try:
         # Check if user is enrolled or is the teacher
-        course_response = supabase.table("courses").select("teacher_id").eq("id", course_id).single().execute()
-        
-        if not course_response.data:
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        # Check permissions
-        is_teacher = course_response.data["teacher_id"] == current_user.user_id
-        is_enrolled = False
-        
-        if not is_teacher:
-            enrollment_response = supabase.table("enrollments").select("id").eq("course_id", course_id).eq("student_id", current_user.user_id).execute()
-            is_enrolled = len(enrollment_response.data) > 0
+        try:
+            course_response = supabase.table("courses").select("teacher_id").eq("id", course_id).execute()
+            
+            if not course_response.data or len(course_response.data) == 0:
+                raise HTTPException(status_code=404, detail="Course not found")
+            
+            # Check permissions
+            is_teacher = course_response.data[0]["teacher_id"] == current_user.user_id
+            is_enrolled = False
+            
+            if not is_teacher:
+                enrollment_response = supabase.table("enrollments").select("id").eq("course_id", course_id).eq("student_id", current_user.user_id).execute()
+                is_enrolled = len(enrollment_response.data) > 0
+        except Exception as e:
+            logger.error(f"Error checking course permissions: {e}")
+            raise HTTPException(status_code=500, detail="Error checking permissions")
         
         if not is_teacher and not is_enrolled:
             raise HTTPException(status_code=403, detail="Access denied")

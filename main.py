@@ -299,6 +299,16 @@ async def create_test_teacher():
     except Exception as e:
         return {"error": f"Failed to create test teacher: {str(e)}"}
 
+# Test authentication endpoint
+@app.get("/api/test/auth-check")
+async def test_auth_check():
+    """Test endpoint to check authentication status"""
+    return {
+        "message": "Authentication test endpoint working",
+        "timestamp": "2025-01-12",
+        "note": "This endpoint doesn't require authentication"
+    }
+
 # Root endpoint
 @app.get("/")
 async def root():

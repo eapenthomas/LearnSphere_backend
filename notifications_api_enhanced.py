@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import os
 from supabase import create_client, Client
-from auth_middleware import get_current_user
+from auth_middleware import get_current_user, TokenData
 
 # Initialize Supabase client
 supabase_url = os.getenv("SUPABASE_URL")
@@ -63,13 +63,13 @@ async def get_notifications(
     unread_only: bool = Query(False),
     type_filter: Optional[str] = Query(None),
     priority_filter: Optional[str] = Query(None),
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Get user notifications with filtering options"""
     try:
         query = supabase.table("notifications")\
             .select("*")\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .order("created_at", desc=True)\
             .range(offset, offset + limit - 1)
         
@@ -99,14 +99,14 @@ async def get_notifications(
 
 @router.get("/count", response_model=Dict[str, int])
 async def get_notification_count(
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Get unread notification count for user"""
     try:
         # Get total unread count directly from table
         result = supabase.table("notifications")\
             .select("id", count="exact")\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .eq("is_read", False)\
             .execute()
         
@@ -123,7 +123,7 @@ async def get_notification_count(
         for notif_type in notification_types:
             type_result = supabase.table("notifications")\
                 .select("id", count="exact")\
-                .eq("user_id", current_user["id"])\
+                .eq("user_id", current_user.user_id)\
                 .eq("type", notif_type)\
                 .eq("is_read", False)\
                 .execute()
@@ -146,7 +146,7 @@ async def get_notification_count(
 @router.put("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(
     notification_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Mark a specific notification as read"""
     try:
@@ -157,7 +157,7 @@ async def mark_notification_read(
                 "read_at": datetime.utcnow().isoformat()
             })\
             .eq("id", notification_id)\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .select()\
             .execute()
         
@@ -174,7 +174,7 @@ async def mark_notification_read(
 
 @router.put("/mark-all-read", response_model=Dict[str, int])
 async def mark_all_notifications_read(
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Mark all user notifications as read"""
     try:
@@ -184,7 +184,7 @@ async def mark_all_notifications_read(
                 "is_read": True,
                 "read_at": datetime.utcnow().isoformat()
             })\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .eq("is_read", False)\
             .execute()
         
@@ -202,14 +202,14 @@ async def mark_all_notifications_read(
 @router.delete("/{notification_id}")
 async def delete_notification(
     notification_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Delete a specific notification"""
     try:
         result = supabase.table("notifications")\
             .delete()\
             .eq("id", notification_id)\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .execute()
         
         if not result.data:
@@ -225,14 +225,14 @@ async def delete_notification(
 
 @router.delete("/cleanup-expired")
 async def cleanup_expired_notifications(
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Clean up expired notifications for the user"""
     try:
         # Only clean up for the current user
         result = supabase.table("notifications")\
             .delete()\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .not_.is_("expires_at", "null")\
             .lt("expires_at", datetime.utcnow().isoformat())\
             .execute()
@@ -250,13 +250,13 @@ async def cleanup_expired_notifications(
 
 @router.get("/preferences", response_model=NotificationPreferences)
 async def get_notification_preferences(
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Get user notification preferences"""
     try:
         result = supabase.table("profiles")\
             .select("notification_preferences")\
-            .eq("id", current_user["id"])\
+            .eq("id", current_user.user_id)\
             .execute()
         
         if not result.data:
@@ -276,13 +276,13 @@ async def get_notification_preferences(
 @router.put("/preferences", response_model=Dict[str, str])
 async def update_notification_preferences(
     preferences: NotificationPreferences,
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Update user notification preferences"""
     try:
         result = supabase.table("profiles")\
             .update({"notification_preferences": preferences.dict()})\
-            .eq("id", current_user["id"])\
+            .eq("id", current_user.user_id)\
             .execute()
         
         if not result.data:
@@ -299,7 +299,7 @@ async def update_notification_preferences(
 @router.post("/create", response_model=NotificationResponse)
 async def create_notification(
     notification: CreateNotificationRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Create a new notification (admin/teacher only)"""
     try:
@@ -536,20 +536,20 @@ async def get_notification_types():
 
 @router.get("/stats", response_model=Dict[str, Any])
 async def get_notification_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Get notification statistics for the user"""
     try:
         # Get total notifications
         total_result = supabase.table("notifications")\
             .select("id", count="exact")\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .execute()
         
         # Get unread notifications
         unread_result = supabase.table("notifications")\
             .select("id", count="exact")\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .eq("is_read", False)\
             .execute()
         
@@ -560,7 +560,7 @@ async def get_notification_stats(
         for priority in priorities:
             priority_result = supabase.table("notifications")\
                 .select("id", count="exact")\
-                .eq("user_id", current_user["id"])\
+                .eq("user_id", current_user.user_id)\
                 .eq("priority", priority)\
                 .eq("is_read", False)\
                 .execute()
@@ -570,7 +570,7 @@ async def get_notification_stats(
         # Get notifications by type (top 5)
         type_result = supabase.table("notifications")\
             .select("type", count="exact")\
-            .eq("user_id", current_user["id"])\
+            .eq("user_id", current_user.user_id)\
             .eq("is_read", False)\
             .order("count", desc=True)\
             .limit(5)\

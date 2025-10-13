@@ -21,6 +21,7 @@ import json
 
 from auth_middleware import get_current_user, get_current_admin, TokenData
 from email_service import email_service
+from ocr_fallback import ocr_fallback_service
 
 load_dotenv()
 
@@ -120,16 +121,34 @@ def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
                 text = pytesseract.image_to_string(image, lang='eng')
                 return text.strip()
             except Exception as ocr_error:
-                print(f"OCR failed for {filename}: {ocr_error}")
-                # Try with different OCR configurations
+                print(f"Tesseract OCR failed for {filename}: {ocr_error}")
+                # Try with different OCR configurations first
                 try:
-                    print(f"Retrying OCR with different configuration...")
+                    print(f"Retrying Tesseract with different configuration...")
                     # Try with different PSM (Page Segmentation Mode)
                     text = pytesseract.image_to_string(image, lang='eng', config='--psm 6')
                     return text.strip()
                 except Exception as retry_error:
-                    print(f"OCR retry also failed: {retry_error}")
-                    raise HTTPException(status_code=400, detail=f"Failed to extract text from image: {str(ocr_error)}")
+                    print(f"Tesseract retry also failed: {retry_error}")
+                    
+                    # Try fallback OCR services
+                    print(f"Attempting fallback OCR services...")
+                    try:
+                        # Convert image to bytes for fallback services
+                        img_buffer = io.BytesIO()
+                        image.save(img_buffer, format='PNG')
+                        image_bytes = img_buffer.getvalue()
+                        
+                        # Try fallback OCR services
+                        fallback_text = ocr_fallback_service.extract_text_fallback(image_bytes)
+                        if fallback_text:
+                            print(f"✅ Fallback OCR succeeded: {len(fallback_text)} characters extracted")
+                            return fallback_text
+                        else:
+                            raise HTTPException(status_code=400, detail="All OCR methods failed. Please ensure the image contains clear, readable text.")
+                    except Exception as fallback_error:
+                        print(f"Fallback OCR also failed: {fallback_error}")
+                        raise HTTPException(status_code=400, detail=f"Failed to extract text from image: {str(ocr_error)}")
             
         elif filename.lower().endswith('.pdf'):
             # Handle PDF files with pdfplumber

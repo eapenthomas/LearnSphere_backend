@@ -56,9 +56,29 @@ class MaterialUpdateRequest(BaseModel):
 # Helper functions
 def get_file_size(file: UploadFile) -> int:
     """Get file size in bytes"""
-    if hasattr(file, 'size'):
-        return file.size
-    return 0
+    try:
+        # Save current position
+        current_position = file.file.tell()
+        
+        # Move to end to get size
+        file.file.seek(0, 2)  # Seek to end
+        file_size = file.file.tell()
+        
+        # Reset to original position
+        file.file.seek(current_position)
+        
+        return file_size
+    except Exception as e:
+        print(f"Error getting file size: {e}")
+        # Fallback: try to read the file content and get length
+        try:
+            file.file.seek(0)
+            content = file.file.read()
+            file.file.seek(0)  # Reset for later use
+            return len(content)
+        except Exception as e2:
+            print(f"Fallback file size calculation failed: {e2}")
+            return 0
 
 def get_file_extension(filename: str) -> str:
     """Get file extension"""

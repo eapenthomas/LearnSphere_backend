@@ -114,6 +114,55 @@ def upload_file_to_supabase(file: UploadFile, course_id: str, folder: str = "mat
             "filename": file.filename
         }
 
+@router.post("/upload", response_model=CourseMaterialResponse)
+async def upload_single_file(
+    course_id: str = Form(...),
+    file: UploadFile = File(...),
+    description: Optional[str] = Form(None),
+    current_user: TokenData = Depends(get_current_teacher)
+):
+    """Upload a single file to a course"""
+    try:
+        # Validate course ownership
+        course_response = supabase.table("courses").select("*").eq("id", course_id).eq("teacher_id", current_user.user_id).single().execute()
+
+        if not course_response.data:
+            raise HTTPException(status_code=404, detail="Course not found or you don't have permission to upload to this course")
+
+        # Upload file to Supabase storage
+        upload_result = upload_file_to_supabase(file, course_id)
+        
+        if not upload_result["success"]:
+            raise HTTPException(status_code=500, detail=f"File upload failed: {upload_result['error']}")
+
+        # Prepare material data
+        material_data = {
+            "course_id": course_id,
+            "file_name": file.filename,
+            "file_url": upload_result["public_url"],
+            "file_size": upload_result["file_size"],
+            "file_type": file.content_type,
+            "uploaded_by": current_user.user_id,
+            "description": description,
+            "uploaded_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+
+        # Insert into database
+        db_response = supabase.table("course_materials").insert(material_data).select().single().execute()
+
+        if not db_response.data:
+            raise HTTPException(status_code=500, detail="Failed to save file metadata to database")
+
+        return CourseMaterialResponse(**db_response.data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
 @router.post("/upload-multiple", response_model=MultipleUploadResponse)
 async def upload_multiple_files(
     course_id: str = Form(...),

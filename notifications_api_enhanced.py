@@ -3,7 +3,8 @@ Enhanced Notifications API for LearnSphere
 Provides comprehensive notification management for students and teachers
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -17,6 +18,20 @@ supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+
+# Add CORS preflight handler
+@router.options("/count")
+async def preflight_count():
+    """Handle CORS preflight for notification count endpoint"""
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
 
 # Pydantic models
 class NotificationResponse(BaseModel):
@@ -99,6 +114,7 @@ async def get_notifications(
 
 @router.get("/count", response_model=Dict[str, int])
 async def get_notification_count(
+    request: Request,
     current_user: TokenData = Depends(get_current_user)
 ):
     """Get unread notification count for user"""
@@ -130,18 +146,30 @@ async def get_notification_count(
             
             type_counts[notif_type] = type_result.count or 0
         
-        return {
+        response_data = {
             "total_unread": total_unread,
             "by_type": type_counts
         }
         
+        # Add CORS headers to response
+        response = JSONResponse(content=response_data)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
+        
     except Exception as e:
         print(f"Error fetching notification count: {e}")
-        # Return a safe fallback instead of throwing 500
-        return {
+        # Return a safe fallback with CORS headers
+        response_data = {
             "total_unread": 0,
             "by_type": {}
         }
+        response = JSONResponse(content=response_data)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
 
 @router.put("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(

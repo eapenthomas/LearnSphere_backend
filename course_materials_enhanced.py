@@ -151,9 +151,13 @@ async def upload_single_file(
     """Upload a single file to a course"""
     try:
         # Validate course ownership
-        course_response = supabase.table("courses").select("*").eq("id", course_id).eq("teacher_id", current_user.user_id).single().execute()
-
-        if not course_response.data:
+        try:
+            course_response = supabase.table("courses").select("*").eq("id", course_id).eq("teacher_id", current_user.user_id).execute()
+            
+            if not course_response.data or len(course_response.data) == 0:
+                raise HTTPException(status_code=404, detail="Course not found or you don't have permission to upload to this course")
+        except Exception as e:
+            logger.error(f"Error validating course ownership: {e}")
             raise HTTPException(status_code=404, detail="Course not found or you don't have permission to upload to this course")
 
         # Check file size (limit to 49MB)
@@ -182,12 +186,19 @@ async def upload_single_file(
         }
 
         # Insert into database
-        db_response = supabase.table("course_materials").insert(material_data).select().single().execute()
+        try:
+            db_response = supabase.table("course_materials").insert(material_data).execute()
+            
+            if not db_response.data or len(db_response.data) == 0:
+                raise HTTPException(status_code=500, detail="Failed to save file metadata to database")
+                
+            # Get the inserted record
+            inserted_material = db_response.data[0]
+        except Exception as e:
+            logger.error(f"Error inserting material to database: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to save file metadata to database: {str(e)}")
 
-        if not db_response.data:
-            raise HTTPException(status_code=500, detail="Failed to save file metadata to database")
-
-        return CourseMaterialResponse(**db_response.data)
+        return CourseMaterialResponse(**inserted_material)
 
     except HTTPException:
         raise
@@ -205,9 +216,13 @@ async def upload_multiple_files(
     """Upload multiple files to a course"""
     try:
         # Validate course ownership
-        course_response = supabase.table("courses").select("*").eq("id", course_id).eq("teacher_id", current_user.user_id).single().execute()
-        
-        if not course_response.data:
+        try:
+            course_response = supabase.table("courses").select("*").eq("id", course_id).eq("teacher_id", current_user.user_id).execute()
+            
+            if not course_response.data or len(course_response.data) == 0:
+                raise HTTPException(status_code=404, detail="Course not found or you don't have permission")
+        except Exception as e:
+            logger.error(f"Error validating course ownership: {e}")
             raise HTTPException(status_code=404, detail="Course not found or you don't have permission")
         
         if len(files) == 0:

@@ -6,6 +6,7 @@ from supabase import create_client, Client
 from datetime import datetime
 from supabase_storage import get_storage_manager
 import uuid
+from auth_middleware import get_current_teacher, TokenData
 
 # Initialize Supabase client
 supabase_url = os.getenv("SUPABASE_URL")
@@ -403,6 +404,42 @@ async def delete_course(course_id: str):
 
     except Exception as e:
         print(f"Error deleting course: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/teacher", response_model=Dict[str, Any])
+async def get_current_teacher_courses(current_user: TokenData = Depends(get_current_teacher)):
+    """Get all courses for the current teacher with enrollment counts"""
+    try:
+        # Get teacher's courses
+        courses_response = supabase.table('courses').select('*').eq('teacher_id', current_user.user_id).order('created_at', desc=True).execute()
+        
+        if not courses_response.data:
+            return {
+                "success": True,
+                "data": [],
+                "message": "No courses found for this teacher"
+            }
+
+        # Get enrollment counts for each course
+        course_ids = [course['id'] for course in courses_response.data]
+        enrollment_counts = {}
+        
+        for course_id in course_ids:
+            enrollments = supabase.table('enrollments').select('id').eq('course_id', course_id).eq('status', 'active').execute()
+            enrollment_counts[course_id] = len(enrollments.data) if enrollments.data else 0
+
+        # Add enrollment counts to courses
+        for course in courses_response.data:
+            course['enrollment_count'] = enrollment_counts.get(course['id'], 0)
+
+        return {
+            "success": True,
+            "data": courses_response.data,
+            "message": f"Found {len(courses_response.data)} courses"
+        }
+
+    except Exception as e:
+        print(f"Error fetching teacher courses: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/teacher/{teacher_id}", response_model=Dict[str, Any])

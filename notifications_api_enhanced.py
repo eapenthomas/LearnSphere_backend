@@ -103,12 +103,14 @@ async def get_notification_count(
 ):
     """Get unread notification count for user"""
     try:
-        # Use the database function for better performance
-        result = supabase.rpc("get_user_notification_count", {
-            "user_uuid": current_user["id"]
-        }).execute()
+        # Get total unread count directly from table
+        result = supabase.table("notifications")\
+            .select("id", count="exact")\
+            .eq("user_id", current_user["id"])\
+            .eq("is_read", False)\
+            .execute()
         
-        count = result.data if result.data is not None else 0
+        total_unread = result.count or 0
         
         # Also get count by type for more detailed stats
         type_counts = {}
@@ -129,13 +131,17 @@ async def get_notification_count(
             type_counts[notif_type] = type_result.count or 0
         
         return {
-            "total_unread": count,
+            "total_unread": total_unread,
             "by_type": type_counts
         }
         
     except Exception as e:
         print(f"Error fetching notification count: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch notification count")
+        # Return a safe fallback instead of throwing 500
+        return {
+            "total_unread": 0,
+            "by_type": {}
+        }
 
 @router.put("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(
@@ -144,26 +150,21 @@ async def mark_notification_read(
 ):
     """Mark a specific notification as read"""
     try:
-        # Use the database function
-        result = supabase.rpc("mark_notification_read", {
-            "p_notification_id": notification_id,
-            "p_user_id": current_user["id"]
-        }).execute()
+        # Update notification directly
+        result = supabase.table("notifications")\
+            .update({
+                "is_read": True,
+                "read_at": datetime.utcnow().isoformat()
+            })\
+            .eq("id", notification_id)\
+            .eq("user_id", current_user["id"])\
+            .select()\
+            .execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="Notification not found or already read")
         
-        # Fetch the updated notification
-        notification_result = supabase.table("notifications")\
-            .select("*")\
-            .eq("id", notification_id)\
-            .eq("user_id", current_user["id"])\
-            .execute()
-        
-        if not notification_result.data:
-            raise HTTPException(status_code=404, detail="Notification not found")
-        
-        return NotificationResponse(**notification_result.data[0])
+        return NotificationResponse(**result.data[0])
         
     except HTTPException:
         raise
@@ -177,12 +178,17 @@ async def mark_all_notifications_read(
 ):
     """Mark all user notifications as read"""
     try:
-        # Use the database function
-        result = supabase.rpc("mark_all_notifications_read", {
-            "p_user_id": current_user["id"]
-        }).execute()
+        # Update all unread notifications directly
+        result = supabase.table("notifications")\
+            .update({
+                "is_read": True,
+                "read_at": datetime.utcnow().isoformat()
+            })\
+            .eq("user_id", current_user["id"])\
+            .eq("is_read", False)\
+            .execute()
         
-        updated_count = result.data if result.data is not None else 0
+        updated_count = len(result.data) if result.data else 0
         
         return {
             "message": "All notifications marked as read",

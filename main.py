@@ -243,6 +243,62 @@ async def test_endpoint():
 async def test_login():
     return {"message": "Test login endpoint working"}
 
+# Test teacher creation endpoint
+@app.post("/api/test/create-teacher")
+async def create_test_teacher():
+    """Create a test teacher for testing purposes"""
+    try:
+        from supabase import create_client
+        import uuid
+        
+        supabase_url = os.environ.get('SUPABASE_URL')
+        supabase_key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+        supabase = create_client(supabase_url, supabase_key)
+        
+        # Check if test teacher already exists
+        existing = supabase.table('profiles').select('*').eq('email', 'aura@example.com').execute()
+        if existing.data:
+            return {
+                "message": "Test teacher already exists",
+                "teacher": existing.data[0],
+                "login_info": {
+                    "email": "aura@example.com",
+                    "password": "testpassword123",
+                    "note": "Use this email and password to login as test teacher"
+                }
+            }
+        
+        # Create test teacher profile
+        teacher_id = str(uuid.uuid4())
+        teacher_data = {
+            "id": teacher_id,
+            "email": "aura@example.com",
+            "full_name": "Aura Test Teacher",
+            "role": "teacher",
+            "approval_status": "approved",
+            "is_active": True,
+            "institution_name": "Test University",
+            "is_verified": True,
+            "ocr_status": "verified",
+            "ai_confidence": 95.0,
+            "verification_reason": "Test teacher for testing purposes"
+        }
+        
+        result = supabase.table('profiles').insert(teacher_data).execute()
+        
+        return {
+            "message": "Test teacher created successfully",
+            "teacher": result.data[0] if result.data else teacher_data,
+            "login_info": {
+                "email": "aura@example.com",
+                "password": "testpassword123",
+                "note": "Use this email and password to login as test teacher"
+            }
+        }
+        
+    except Exception as e:
+        return {"error": f"Failed to create test teacher: {str(e)}"}
+
 # Root endpoint
 @app.get("/")
 async def root():

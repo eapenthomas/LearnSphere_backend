@@ -329,7 +329,7 @@ async def create_test_teacher():
             "institution_name": "Test University",
             "is_verified": True,
             "ocr_status": "verified",
-            "ai_confidence": 95.0,
+            "ai_confidence": 95,
             "verification_reason": "Test teacher for testing purposes"
         }
         

@@ -174,6 +174,7 @@ async def upload_single_file(
         # Prepare material data
         material_data = {
             "course_id": course_id,
+            "title": description or file.filename,  # Use description as title, fallback to filename
             "file_name": file.filename,
             "file_url": upload_result["public_url"],
             "file_size": file_size,
@@ -261,6 +262,7 @@ async def upload_multiple_files(
                 # Save to database
                 material_data = {
                     "course_id": course_id,
+                    "title": description or file.filename,  # Use description as title, fallback to filename
                     "file_name": file.filename,
                     "file_url": upload_result["public_url"],
                     "file_size": file_size,

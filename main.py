@@ -270,17 +270,8 @@ async def create_test_teacher():
         except:
             auth_user_exists = False
         
-        if existing_profile.data and auth_user_exists:
-            return {
-                "message": "Test teacher already exists and is fully operational",
-                "teacher": existing_profile.data[0],
-                "login_info": {
-                    "email": email,
-                    "password": password,
-                    "note": "Test teacher is ready to use"
-                },
-                "status": "ready"
-            }
+        # Always update password fields even if teacher exists
+        print("✅ Updating test teacher with password fields for direct login")
         
         # Create or update auth user
         try:

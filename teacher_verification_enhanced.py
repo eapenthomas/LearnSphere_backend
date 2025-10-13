@@ -94,13 +94,42 @@ def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
             
             # Extract text using OCR
             try:
-                # Configure Tesseract path for Windows
-                pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+                # Configure Tesseract path - try multiple possible locations
+                tesseract_paths = [
+                    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                    '/usr/bin/tesseract',  # Linux
+                    '/usr/local/bin/tesseract',  # macOS
+                    'tesseract',  # If in PATH
+                ]
+                
+                tesseract_found = False
+                for path in tesseract_paths:
+                    try:
+                        pytesseract.pytesseract.tesseract_cmd = path
+                        # Test if this path works
+                        pytesseract.get_tesseract_version()
+                        tesseract_found = True
+                        break
+                    except:
+                        continue
+                
+                if not tesseract_found:
+                    raise Exception("Tesseract OCR not found. Please install Tesseract OCR.")
+                
                 text = pytesseract.image_to_string(image, lang='eng')
                 return text.strip()
             except Exception as ocr_error:
-                print(f"OCR failed: {ocr_error}")
-                raise HTTPException(status_code=400, detail=f"Failed to extract text from image: {str(ocr_error)}")
+                print(f"OCR failed for {filename}: {ocr_error}")
+                # Try with different OCR configurations
+                try:
+                    print(f"Retrying OCR with different configuration...")
+                    # Try with different PSM (Page Segmentation Mode)
+                    text = pytesseract.image_to_string(image, lang='eng', config='--psm 6')
+                    return text.strip()
+                except Exception as retry_error:
+                    print(f"OCR retry also failed: {retry_error}")
+                    raise HTTPException(status_code=400, detail=f"Failed to extract text from image: {str(ocr_error)}")
             
         elif filename.lower().endswith('.pdf'):
             # Handle PDF files with pdfplumber

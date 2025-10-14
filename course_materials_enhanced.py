@@ -195,11 +195,25 @@ async def upload_single_file(
                 
             # Get the inserted record
             inserted_material = db_response.data[0]
+            
+            # Get uploader name
+            try:
+                user_response = supabase.table("profiles").select("full_name").eq("id", current_user.user_id).execute()
+                uploader_name = user_response.data[0].get("full_name", "Unknown") if user_response.data else "Unknown"
+            except:
+                uploader_name = "Unknown"
+            
+            # Create response with uploader name
+            response_data = {
+                **inserted_material,
+                "uploader_name": uploader_name
+            }
+            
         except Exception as e:
             logger.error(f"Error inserting material to database: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to save file metadata to database: {str(e)}")
 
-        return CourseMaterialResponse(**inserted_material)
+        return CourseMaterialResponse(**response_data)
 
     except HTTPException:
         raise
@@ -279,8 +293,11 @@ async def upload_multiple_files(
                     material = db_response.data[0]
                     
                     # Get uploader name
-                    user_response = supabase.table("profiles").select("full_name").eq("id", current_user.user_id).single().execute()
-                    uploader_name = user_response.data.get("full_name", "Unknown") if user_response.data else "Unknown"
+                    try:
+                        user_response = supabase.table("profiles").select("full_name").eq("id", current_user.user_id).execute()
+                        uploader_name = user_response.data[0].get("full_name", "Unknown") if user_response.data else "Unknown"
+                    except:
+                        uploader_name = "Unknown"
                     
                     uploaded_files.append(CourseMaterialResponse(
                         id=material["id"],
@@ -348,7 +365,7 @@ async def get_course_materials(
         # Get materials
         materials_response = supabase.table("course_materials").select("""
             *,
-            profiles!course_materials_uploaded_by_fkey(full_name)
+            profiles!uploaded_by(full_name)
         """).eq("course_id", course_id).order("uploaded_at", desc=True).execute()
         
         materials = []

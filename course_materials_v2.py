@@ -353,10 +353,13 @@ async def get_course_materials(
                 view_count=stats["view_count"]
             ))
         
-        # Get progress for students
+        # Get progress for students and auto-sync
         progress = None
         if is_student:
             try:
+                # Auto-sync course progress when student accesses materials
+                update_course_progress(current_user.user_id, course_id)
+                
                 total_materials = len(materials)
                 completed_materials_result = supabase.table("material_progress").select("material_id").eq("student_id", current_user.user_id).eq("course_id", course_id).execute()
                 completed_materials = len(set([item["material_id"] for item in completed_materials_result.data]))
@@ -369,8 +372,10 @@ async def get_course_materials(
                     completed_materials=completed_materials,
                     progress_percentage=progress_percentage
                 )
+                
+                logger.info(f"Auto-synced progress for student {current_user.user_id} in course {course_id}: {progress_percentage}%")
             except Exception as e:
-                logger.error(f"Error getting progress: {e}")
+                logger.error(f"Error getting/syncing progress: {e}")
         
         logger.info(f"Successfully fetched {len(materials)} materials for course {course_id}")
         
@@ -415,6 +420,80 @@ async def track_material_view(
     except Exception as e:
         logger.error(f"Error tracking view: {e}")
         raise HTTPException(status_code=500, detail="Failed to track view")
+
+@router.post("/sync-all-course-progress")
+async def sync_all_course_progress(
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Sync course progress for all enrolled courses (Students only)"""
+    try:
+        # Get all enrolled courses for the student
+        enrollments_result = supabase.table("enrollments").select("course_id").eq("student_id", current_user.user_id).eq("status", "active").execute()
+        
+        if not enrollments_result.data:
+            return {"success": True, "message": "No enrolled courses found", "synced_courses": 0}
+        
+        synced_courses = 0
+        for enrollment in enrollments_result.data:
+            course_id = enrollment["course_id"]
+            try:
+                update_course_progress(current_user.user_id, course_id)
+                synced_courses += 1
+            except Exception as e:
+                logger.error(f"Error syncing progress for course {course_id}: {e}")
+        
+        return {
+            "success": True,
+            "message": f"Synced progress for {synced_courses} courses",
+            "synced_courses": synced_courses
+        }
+        
+    except Exception as e:
+        logger.error(f"Error syncing all course progress: {e}")
+        raise HTTPException(status_code=500, detail="Failed to sync course progress")
+
+@router.post("/sync-course-progress/{course_id}")
+async def sync_course_progress(
+    course_id: str,
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Sync course progress for a student when they access course materials"""
+    try:
+        # Check if user is enrolled student
+        if not validate_student_enrollment(course_id, current_user.user_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Update course progress
+        update_course_progress(current_user.user_id, course_id)
+        
+        # Get updated progress
+        try:
+            total_materials_result = supabase.table("course_materials").select("id").eq("course_id", course_id).eq("is_active", True).execute()
+            total_materials = len(total_materials_result.data)
+            
+            if total_materials == 0:
+                return {"success": True, "message": "No materials found", "progress": 0}
+            
+            completed_materials_result = supabase.table("material_progress").select("material_id").eq("student_id", current_user.user_id).eq("course_id", course_id).execute()
+            completed_materials = len(set([item["material_id"] for item in completed_materials_result.data]))
+            progress_percentage = int((completed_materials / total_materials) * 100)
+            
+            return {
+                "success": True,
+                "message": "Course progress synced",
+                "progress": progress_percentage,
+                "completed_materials": completed_materials,
+                "total_materials": total_materials
+            }
+        except Exception as e:
+            logger.error(f"Error getting updated progress: {e}")
+            return {"success": True, "message": "Progress synced but couldn't retrieve details"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing course progress: {e}")
+        raise HTTPException(status_code=500, detail="Failed to sync course progress")
 
 @router.post("/track-download/{material_id}")
 async def track_material_download(

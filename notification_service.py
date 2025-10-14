@@ -539,6 +539,7 @@ class NotificationService:
         try:
             if not self.smtp_username or not self.smtp_password:
                 print(f"⚠️ Email not sent to {to_email} - SMTP configuration missing")
+                print("💡 Please configure SMTP_USERNAME and SMTP_PASSWORD in Render environment variables")
                 return False
 
             # Create message
@@ -554,14 +555,21 @@ class NotificationService:
             msg.attach(text_part)
             msg.attach(html_part)
 
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg)
+            # Send email with better error handling
+            try:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
+                    server.starttls()
+                    server.login(self.smtp_username, self.smtp_password)
+                    server.send_message(msg)
 
-            print(f"✅ Email sent successfully to {to_email}: {subject}")
-            return True
+                print(f"✅ Email sent successfully to {to_email}: {subject}")
+                return True
+                
+            except (smtplib.SMTPException, OSError, ConnectionError) as smtp_error:
+                print(f"❌ SMTP Error sending to {to_email}: {smtp_error}")
+                print(f"💡 Tip: For Gmail, use App Password instead of regular password")
+                print(f"💡 Tip: Check SMTP settings: {self.smtp_server}:{self.smtp_port}")
+                return False
 
         except Exception as e:
             print(f"❌ Failed to send email to {to_email}: {str(e)}")

@@ -1,6 +1,7 @@
 import os
 import smtplib
 import secrets
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -21,10 +22,18 @@ class EmailService:
         self.from_email = os.getenv("FROM_EMAIL", self.smtp_username)
         self.from_name = os.getenv("FROM_NAME", "LearnSphere")
         
+        # SendGrid configuration
+        self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
+        self.use_sendgrid = bool(self.sendgrid_api_key)
+        
         # Validate configuration
-        if not self.smtp_username or not self.smtp_password:
+        if not self.use_sendgrid and (not self.smtp_username or not self.smtp_password):
             print("⚠️ Warning: Email configuration not found. OTP emails will not be sent.")
-            print("Please set SMTP_USERNAME and SMTP_PASSWORD in your .env file")
+            print("Please set either SMTP_USERNAME/SMTP_PASSWORD or SENDGRID_API_KEY in your .env file")
+        elif self.use_sendgrid:
+            print("✅ Using SendGrid for email delivery")
+        else:
+            print("✅ Using SMTP for email delivery")
     
     def generate_otp(self, length: int = 6) -> str:
         """Generate a random OTP code"""
@@ -188,15 +197,21 @@ LearnSphere Team
     def send_event_notification(self, to_email: str, event_type: str, event_data: dict) -> bool:
         """Send event-based notifications"""
         try:
-            if not self.smtp_username or not self.smtp_password:
-                print("⚠️ Email configuration not available")
-                return False
-
             # Create email content based on event type
             subject, html_content = self._create_event_email_content(event_type, event_data)
 
             if not subject or not html_content:
                 print(f"⚠️ Unknown event type: {event_type}")
+                return False
+
+            # Try SendGrid first if available
+            if self.use_sendgrid:
+                return self.send_email_via_sendgrid(to_email, subject, html_content)
+
+            # Fallback to SMTP
+            if not self.smtp_username or not self.smtp_password:
+                print("⚠️ Email configuration not available - skipping notification")
+                print("💡 Configure either SENDGRID_API_KEY or SMTP_USERNAME/SMTP_PASSWORD")
                 return False
 
             # Create message
@@ -209,17 +224,81 @@ LearnSphere Team
             html_part = MIMEText(html_content, 'html')
             msg.attach(html_part)
 
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg)
+            # Send email with timeout and retry logic
+            try:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
+                    server.starttls()
+                    server.login(self.smtp_username, self.smtp_password)
+                    server.send_message(msg)
 
-            print(f"✅ Event notification sent successfully to {to_email}")
-            return True
+                print(f"✅ Event notification sent successfully to {to_email}")
+                return True
+                
+            except (smtplib.SMTPException, OSError, ConnectionError) as smtp_error:
+                print(f"❌ SMTP Error sending to {to_email}: {smtp_error}")
+                print(f"💡 Tip: Check SMTP credentials and network connectivity")
+                return False
 
         except Exception as e:
             print(f"❌ Failed to send event notification: {e}")
+            return False
+
+    def send_email_via_sendgrid(self, to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+        """Send email via SendGrid API"""
+        try:
+            if not self.sendgrid_api_key:
+                print("❌ SendGrid API key not configured")
+                return False
+
+            # Prepare SendGrid API request
+            url = "https://api.sendgrid.com/v3/mail/send"
+            
+            payload = {
+                "personalizations": [
+                    {
+                        "to": [{"email": to_email}],
+                        "subject": subject
+                    }
+                ],
+                "from": {
+                    "email": self.from_email,
+                    "name": self.from_name
+                },
+                "content": [
+                    {
+                        "type": "text/html",
+                        "value": html_content
+                    }
+                ]
+            }
+            
+            # Add text content if provided
+            if text_content:
+                payload["content"].insert(0, {
+                    "type": "text/plain",
+                    "value": text_content
+                })
+
+            headers = {
+                "Authorization": f"Bearer {self.sendgrid_api_key}",
+                "Content-Type": "application/json"
+            }
+
+            # Send request
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            if response.status_code == 202:
+                print(f"✅ Email sent successfully via SendGrid to {to_email}: {subject}")
+                return True
+            else:
+                print(f"❌ SendGrid API error: {response.status_code} - {response.text}")
+                return False
+
+        except requests.RequestException as e:
+            print(f"❌ SendGrid request failed: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ SendGrid error: {e}")
             return False
 
     def _create_event_email_content(self, event_type: str, event_data: dict) -> tuple:

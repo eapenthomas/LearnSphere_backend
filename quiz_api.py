@@ -262,6 +262,94 @@ async def get_quiz_submissions(quiz_id: str):
         print(f"Error fetching quiz submissions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/submission/{submission_id}")
+async def get_submission_details(submission_id: str):
+    """Get detailed submission data including answers for a specific submission"""
+    try:
+        # Get submission details
+        submission_response = supabase.table('quiz_submissions').select('''
+            *,
+            profiles!quiz_submissions_student_id_fkey (
+                id,
+                full_name,
+                email
+            )
+        ''').eq('id', submission_id).single().execute()
+        
+        if not submission_response.data:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        
+        submission = submission_response.data
+        
+        # Get quiz details
+        quiz_response = supabase.table('quizzes').select('''
+            *,
+            courses!quizzes_course_id_fkey (
+                id,
+                title,
+                code
+            )
+        ''').eq('id', submission['quiz_id']).single().execute()
+        
+        quiz = quiz_response.data if quiz_response.data else {}
+        
+        # Get detailed answers for this submission
+        answers_response = supabase.table('quiz_submission_answers').select('''
+            *,
+            quiz_questions!quiz_submission_answers_question_id_fkey (
+                id,
+                question_text,
+                question_type,
+                options,
+                correct_answer,
+                marks,
+                order_index
+            )
+        ''').eq('submission_id', submission_id).order('created_at').execute()
+        
+        # Format the answers data
+        answers = []
+        for answer in answers_response.data:
+            question = answer.get('quiz_questions', {})
+            formatted_answer = {
+                'question_id': answer['question_id'],
+                'question_text': question.get('question_text', ''),
+                'question_type': question.get('question_type', ''),
+                'student_answer': answer.get('student_answer', ''),
+                'correct_answer': question.get('correct_answer', ''),
+                'is_correct': answer.get('is_correct', False),
+                'marks': answer.get('marks_awarded', 0),
+                'options': question.get('options', []),
+                'order_index': question.get('order_index', 0)
+            }
+            answers.append(formatted_answer)
+        
+        # Sort answers by order_index
+        answers.sort(key=lambda x: x['order_index'])
+        
+        # Combine all data
+        result = {
+            'id': submission['id'],
+            'quiz_id': submission['quiz_id'],
+            'student_id': submission['student_id'],
+            'score': submission['score'],
+            'total_marks': submission['total_marks'],
+            'time_taken_minutes': submission.get('time_taken_minutes', 0),
+            'submitted_at': submission['submitted_at'],
+            'created_at': submission['created_at'],
+            'student': submission.get('profiles'),
+            'quiz': quiz,
+            'answers': answers
+        }
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching submission details: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/courses/{teacher_id}")
 async def get_teacher_courses(teacher_id: str):
     """Get courses taught by a specific teacher for quiz creation"""

@@ -428,11 +428,8 @@ async def get_quiz_for_student(quiz_id: str, student_id: str):
         # Get questions without correct answers
         questions_response = supabase.table('quiz_questions').select('id, question_text, question_type, options, marks, order_index').eq('quiz_id', quiz_id).order('order_index').execute()
 
-        # Remove correct answers from options
-        for question in questions_response.data:
-            if question['question_type'] == 'mcq' and question['options']:
-                for option in question['options']:
-                    option.pop('is_correct', None)
+        # Remove correct answers from options (options are stored as simple strings, not objects)
+        # No need to remove is_correct since options are stored as plain text arrays
 
         quiz_data = quiz_response.data
         quiz_data['questions'] = questions_response.data

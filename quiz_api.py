@@ -343,7 +343,6 @@ async def get_submission_details(submission_id: str):
             'total_marks': submission['total_marks'],
             'time_taken_minutes': submission.get('time_taken_minutes', 0),
             'submitted_at': submission['submitted_at'],
-            'created_at': submission['created_at'],
             'student': student,
             'quiz': {
                 **quiz,

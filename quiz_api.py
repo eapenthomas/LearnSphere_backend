@@ -267,14 +267,7 @@ async def get_submission_details(submission_id: str):
     """Get detailed submission data including answers for a specific submission"""
     try:
         # Get submission details
-        submission_response = supabase.table('quiz_submissions').select('''
-            *,
-            profiles!quiz_submissions_student_id_fkey (
-                id,
-                full_name,
-                email
-            )
-        ''').eq('id', submission_id).single().execute()
+        submission_response = supabase.table('quiz_submissions').select('*').eq('id', submission_id).single().execute()
         
         if not submission_response.data:
             raise HTTPException(status_code=404, detail="Submission not found")
@@ -282,16 +275,19 @@ async def get_submission_details(submission_id: str):
         submission = submission_response.data
         
         # Get quiz details
-        quiz_response = supabase.table('quizzes').select('''
-            *,
-            courses!quizzes_course_id_fkey (
-                id,
-                title,
-                code
-            )
-        ''').eq('id', submission['quiz_id']).single().execute()
+        quiz_response = supabase.table('quizzes').select('*').eq('id', submission['quiz_id']).single().execute()
         
         quiz = quiz_response.data if quiz_response.data else {}
+        
+        # Get student details
+        student_response = supabase.table('profiles').select('id, full_name, email').eq('id', submission['student_id']).single().execute()
+        student = student_response.data if student_response.data else {}
+        
+        # Get course details if quiz has course_id
+        course = {}
+        if quiz.get('course_id'):
+            course_response = supabase.table('courses').select('id, title, code').eq('id', quiz['course_id']).single().execute()
+            course = course_response.data if course_response.data else {}
         
         # Get quiz questions to match with student answers
         questions_response = supabase.table('quiz_questions').select('*').eq('quiz_id', submission['quiz_id']).order('order_index').execute()
@@ -348,8 +344,11 @@ async def get_submission_details(submission_id: str):
             'time_taken_minutes': submission.get('time_taken_minutes', 0),
             'submitted_at': submission['submitted_at'],
             'created_at': submission['created_at'],
-            'student': submission.get('profiles'),
-            'quiz': quiz,
+            'student': student,
+            'quiz': {
+                **quiz,
+                'courses': course
+            },
             'answers': answers
         }
         

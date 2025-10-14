@@ -384,7 +384,7 @@ async def get_course_materials(
                 uploader_name=material["profiles"]["full_name"] if material.get("profiles") else "Unknown"
             ))
         
-        return materials
+        return {"materials": materials}
         
     except HTTPException:
         raise

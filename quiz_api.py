@@ -293,32 +293,43 @@ async def get_submission_details(submission_id: str):
         
         quiz = quiz_response.data if quiz_response.data else {}
         
-        # Get detailed answers for this submission
-        answers_response = supabase.table('quiz_submission_answers').select('''
-            *,
-            quiz_questions!quiz_submission_answers_question_id_fkey (
-                id,
-                question_text,
-                question_type,
-                options,
-                correct_answer,
-                marks,
-                order_index
-            )
-        ''').eq('submission_id', submission_id).order('created_at').execute()
+        # Get quiz questions to match with student answers
+        questions_response = supabase.table('quiz_questions').select('*').eq('quiz_id', submission['quiz_id']).order('order_index').execute()
+        questions = {q['id']: q for q in questions_response.data} if questions_response.data else {}
         
-        # Format the answers data
+        # Format the answers data from the JSONB answers column
         answers = []
-        for answer in answers_response.data:
-            question = answer.get('quiz_questions', {})
+        student_answers = submission.get('answers', [])
+        
+        for student_answer in student_answers:
+            question_id = student_answer.get('question_id')
+            question = questions.get(question_id, {})
+            
+            # Determine if answer is correct based on question type
+            student_answer_text = student_answer.get('answer', '')
+            is_correct = False
+            
+            if question.get('question_type') == 'mcq':
+                # For MCQ, check if student answer matches any correct option
+                options = question.get('options', [])
+                for option in options:
+                    if option.get('is_correct', False) and option.get('text') == student_answer_text:
+                        is_correct = True
+                        break
+            else:
+                # For other types, compare with correct_answer field
+                correct_answer = question.get('correct_answer', '')
+                if student_answer_text.lower().strip() == correct_answer.lower().strip():
+                    is_correct = True
+            
             formatted_answer = {
-                'question_id': answer['question_id'],
+                'question_id': question_id,
                 'question_text': question.get('question_text', ''),
                 'question_type': question.get('question_type', ''),
-                'student_answer': answer.get('student_answer', ''),
+                'student_answer': student_answer_text,
                 'correct_answer': question.get('correct_answer', ''),
-                'is_correct': answer.get('is_correct', False),
-                'marks': answer.get('marks_awarded', 0),
+                'is_correct': is_correct,
+                'marks': question.get('marks', 0) if is_correct else 0,
                 'options': question.get('options', []),
                 'order_index': question.get('order_index', 0)
             }

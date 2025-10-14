@@ -571,4 +571,4 @@ async def verify_otp(request: VerifyOTPRequest):
 @router.post("/check-email", response_model=EmailCheckResponse)
 async def check_email(request: EmailCheckRequest):
     """Check if email exists"""
-    return await AuthService.check_email(request)
+    return await AuthService.check_email_availability(request)

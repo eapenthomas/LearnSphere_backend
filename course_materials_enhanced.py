@@ -221,14 +221,15 @@ async def upload_single_file(
         logger.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-@router.post("/upload-multiple", response_model=MultipleUploadResponse)
-async def upload_multiple_files(
+# Multiple file upload disabled - using single file upload only
+# @router.post("/upload-multiple", response_model=MultipleUploadResponse)
+async def upload_multiple_files_disabled(
     course_id: str = Form(...),
     files: List[UploadFile] = File(...),
     description: Optional[str] = Form(None),
     current_user: TokenData = Depends(get_current_teacher)
 ):
-    """Upload multiple files to a course"""
+    """Upload multiple files to a course - DISABLED"""
     try:
         # Validate course ownership
         try:
@@ -334,7 +335,7 @@ async def upload_multiple_files(
         logger.error(f"Multiple upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-@router.get("/course/{course_id}", response_model=List[CourseMaterialResponse])
+@router.get("/course/{course_id}")
 async def get_course_materials(
     course_id: str,
     current_user: TokenData = Depends(get_current_user)

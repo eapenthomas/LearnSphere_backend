@@ -110,7 +110,7 @@ try:
     from thumbnail_api import router as thumbnail_router
     from file_download_api import router as file_download_router
     from profile_picture_api import router as profile_picture_router
-    from course_materials_enhanced import router as course_materials_enhanced_router
+    from course_materials_v2 import router as course_materials_router
     
     # Import admin routers
     from admin_api import router as admin_router
@@ -212,7 +212,7 @@ try:
     app.include_router(thumbnail_router)
     app.include_router(file_download_router)
     app.include_router(profile_picture_router)
-    app.include_router(course_materials_enhanced_router)
+    app.include_router(course_materials_router)
     app.include_router(admin_router)
     app.include_router(admin_dashboard_router)
     app.include_router(admin_notifications_router)

@@ -99,6 +99,8 @@ try:
     print("📦 Importing auth router...")
     from auth import router as auth_router
     print(f"✅ Auth router imported: {auth_router}")
+    from google_auth_v2 import router as google_auth_router
+    print(f"✅ Google auth router imported (v2)")
     from auth_refresh_api import router as auth_refresh_router
     from notification_api import router as notification_router
     from notifications_api_enhanced import router as notifications_enhanced_router
@@ -201,6 +203,7 @@ try:
     
     # Include routers in optimized order (most used first)
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+    app.include_router(google_auth_router, prefix="/api/auth", tags=["Google Auth"])
     app.include_router(auth_refresh_router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(notification_router)
     app.include_router(notifications_enhanced_router)

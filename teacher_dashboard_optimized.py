@@ -111,65 +111,65 @@ async def get_optimized_teacher_stats(teacher_id: str):
         else:
             avg_quiz_score = 0
         
-                # Get recent enrollments for activity
-                recent_enrollments_response = supabase.table('enrollments')\
-                    .select('student_id, course_id, enrolled_at')\
-                    .in_('course_id', course_ids)\
-                    .order('enrolled_at', desc=True)\
-                    .limit(10)\
-                    .execute()
-                
-                recent_enrollments = recent_enrollments_response.data if recent_enrollments_response.data else []
-                
-                # Get enrollment trends for the last 7 days (for charts)
-                enrollment_trends = []
-                for i in range(7):
-                    date = (datetime.now() - timedelta(days=6-i)).date()
-                    start_of_day = datetime.combine(date, datetime.min.time())
-                    end_of_day = datetime.combine(date, datetime.max.time())
-                    
-                    daily_enrollments_response = supabase.table('enrollments')\
-                        .select('id', count='exact')\
-                        .in_('course_id', course_ids)\
-                        .gte('enrolled_at', start_of_day.isoformat())\
-                        .lte('enrolled_at', end_of_day.isoformat())\
-                        .execute()
-                    
-                    count = daily_enrollments_response.count if daily_enrollments_response.count else 0
-                    enrollment_trends.append({
-                        'date': date.strftime('%b %d'),
-                        'enrollments': count
-                    })
-                
-                # Get course performance data (completion rates)
-                course_performance = []
-                for course in courses[:5]:  # Top 5 courses
-                    course_id = course['id']
-                    
-                    # Get total enrollments for this course
-                    total_enrollments_response = supabase.table('enrollments')\
-                        .select('id', count='exact')\
-                        .eq('course_id', course_id)\
-                        .execute()
-                    
-                    total_enrollments = total_enrollments_response.count if total_enrollments_response.count else 0
-                    
-                    # Get completion data (students who completed the course)
-                    completed_response = supabase.table('course_completions')\
-                        .select('id', count='exact')\
-                        .eq('course_id', course_id)\
-                        .eq('status', 'completed')\
-                        .execute()
-                    
-                    completed_count = completed_response.count if completed_response.count else 0
-                    completion_rate = round((completed_count / total_enrollments * 100) if total_enrollments > 0 else 0, 1)
-                    
-                    course_performance.append({
-                        'course_id': course_id,
-                        'course_title': course['title'][:20] + '...' if len(course['title']) > 20 else course['title'],
-                        'enrollment_count': total_enrollments,
-                        'completion_rate': completion_rate
-                    })
+        # Get recent enrollments for activity
+        recent_enrollments_response = supabase.table('enrollments')\
+            .select('student_id, course_id, enrolled_at')\
+            .in_('course_id', course_ids)\
+            .order('enrolled_at', desc=True)\
+            .limit(10)\
+            .execute()
+        
+        recent_enrollments = recent_enrollments_response.data if recent_enrollments_response.data else []
+        
+        # Get enrollment trends for the last 7 days (for charts)
+        enrollment_trends = []
+        for i in range(7):
+            date = (datetime.now() - timedelta(days=6-i)).date()
+            start_of_day = datetime.combine(date, datetime.min.time())
+            end_of_day = datetime.combine(date, datetime.max.time())
+            
+            daily_enrollments_response = supabase.table('enrollments')\
+                .select('id', count='exact')\
+                .in_('course_id', course_ids)\
+                .gte('enrolled_at', start_of_day.isoformat())\
+                .lte('enrolled_at', end_of_day.isoformat())\
+                .execute()
+            
+            count = daily_enrollments_response.count if daily_enrollments_response.count else 0
+            enrollment_trends.append({
+                'date': date.strftime('%b %d'),
+                'enrollments': count
+            })
+        
+        # Get course performance data (completion rates)
+        course_performance = []
+        for course in courses[:5]:  # Top 5 courses
+            course_id = course['id']
+            
+            # Get total enrollments for this course
+            total_enrollments_response = supabase.table('enrollments')\
+                .select('id', count='exact')\
+                .eq('course_id', course_id)\
+                .execute()
+            
+            total_enrollments = total_enrollments_response.count if total_enrollments_response.count else 0
+            
+            # Get completion data (students who completed the course)
+            completed_response = supabase.table('course_completions')\
+                .select('id', count='exact')\
+                .eq('course_id', course_id)\
+                .eq('status', 'completed')\
+                .execute()
+            
+            completed_count = completed_response.count if completed_response.count else 0
+            completion_rate = round((completed_count / total_enrollments * 100) if total_enrollments > 0 else 0, 1)
+            
+            course_performance.append({
+                'course_id': course_id,
+                'course_title': course['title'][:20] + '...' if len(course['title']) > 20 else course['title'],
+                'enrollment_count': total_enrollments,
+                'completion_rate': completion_rate
+            })
         
         # Build response
         response = {
@@ -183,10 +183,10 @@ async def get_optimized_teacher_stats(teacher_id: str):
                     'pending_submissions': pending_submissions,
                     'avg_quiz_score': round(avg_quiz_score, 1)
                 },
-                        'courses': courses[:5],  # Top 5 recent courses
-                        'recent_activity': recent_enrollments,
-                        'enrollment_trends': enrollment_trends,
-                        'course_performance': course_performance
+                'courses': courses[:5],  # Top 5 recent courses
+                'recent_activity': recent_enrollments,
+                'enrollment_trends': enrollment_trends,
+                'course_performance': course_performance
             },
             'cached': False,
             'timestamp': datetime.now().isoformat()

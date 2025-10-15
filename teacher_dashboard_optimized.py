@@ -6,7 +6,8 @@ Provides all dashboard data in a single efficient query
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 from datetime import datetime, timedelta
-from auth import get_current_user, supabase
+from auth_middleware import get_current_user
+from auth import supabase
 
 router = APIRouter(prefix="/api/teacher/dashboard", tags=["Teacher Dashboard"])
 

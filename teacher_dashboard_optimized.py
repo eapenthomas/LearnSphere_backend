@@ -25,7 +25,7 @@ async def get_optimized_teacher_stats(teacher_id: str):
         courses_response = supabase.table('courses')\
             .select('*')\
             .eq('teacher_id', teacher_id)\
-            .eq('is_active', True)\
+            .eq('status', 'active')\
             .order('created_at', desc=True)\
             .execute()
         

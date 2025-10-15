@@ -154,11 +154,11 @@ async def get_optimized_teacher_stats(teacher_id: str):
             
             total_enrollments = total_enrollments_response.count if total_enrollments_response.count else 0
             
-            # Get completion data (students who completed the course)
+            # Get completion data (students who completed the course - 100% completion)
             completed_response = supabase.table('course_completions')\
                 .select('id', count='exact')\
                 .eq('course_id', course_id)\
-                .eq('status', 'completed')\
+                .eq('completion_percentage', 100)\
                 .execute()
             
             completed_count = completed_response.count if completed_response.count else 0

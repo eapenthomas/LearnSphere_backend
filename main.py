@@ -123,6 +123,7 @@ try:
     from teacher_analytics_api import router as teacher_analytics_router
     from teacher_reports_api import router as teacher_reports_router
     from teacher_rating_api import router as teacher_rating_router
+    from teacher_dashboard_optimized import router as teacher_dashboard_router
     
     # Import other routers (with error handling for optional dependencies)
     try:
@@ -222,6 +223,7 @@ try:
     app.include_router(teacher_analytics_router)
     app.include_router(teacher_reports_router)
     app.include_router(teacher_rating_router)
+    app.include_router(teacher_dashboard_router)
     
     # Include optional routers only if they were imported successfully
     if ai_usage_router:

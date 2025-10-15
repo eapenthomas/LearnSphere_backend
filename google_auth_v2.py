@@ -6,8 +6,8 @@ Handles Google OAuth login and signup with robust error handling
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 import os
-from backend.models import AuthResponse
-from backend.auth import supabase, supabase_admin
+from models import AuthResponse
+from auth import supabase, supabase_admin
 
 router = APIRouter()
 

@@ -87,6 +87,8 @@ class CourseListResponse(BaseModel):
     is_paid: bool
     teacher_name: str
     enrollment_status: str  # "enrolled", "not_enrolled", "free"
+    thumbnail_url: Optional[str] = None
+    category: Optional[str] = None
 
 # Razorpay Helper Functions
 def create_razorpay_product(course_title: str, course_description: str) -> str:
@@ -280,7 +282,9 @@ async def get_available_courses(student: TokenData = Depends(get_current_student
             price,
             is_paid,
             created_at,
-            teacher_id
+            teacher_id,
+            thumbnail_url,
+            category
         """).execute()
         
         if not courses_response.data:
@@ -315,7 +319,9 @@ async def get_available_courses(student: TokenData = Depends(get_current_student
                 price=course["price"],
                 is_paid=course["is_paid"],
                 teacher_name=teacher_name,
-                enrollment_status=enrollment_status
+                enrollment_status=enrollment_status,
+                thumbnail_url=course.get("thumbnail_url"),
+                category=course.get("category")
             ))
         
         return courses
@@ -500,7 +506,9 @@ async def get_enrolled_courses(student: TokenData = Depends(get_current_student)
             price,
             is_paid,
             created_at,
-            teacher_id
+            teacher_id,
+            thumbnail_url,
+            category
         """).in_("id", course_ids).execute()
         
         if not courses_response.data:
@@ -523,7 +531,9 @@ async def get_enrolled_courses(student: TokenData = Depends(get_current_student)
                 price=course["price"],
                 is_paid=course["is_paid"],
                 teacher_name=teacher_name,
-                enrollment_status="enrolled"
+                enrollment_status="enrolled",
+                thumbnail_url=course.get("thumbnail_url"),
+                category=course.get("category")
             ))
         
         return courses

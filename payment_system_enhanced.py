@@ -87,6 +87,7 @@ class CourseListResponse(BaseModel):
     is_paid: bool
     teacher_name: str
     enrollment_status: str  # "enrolled", "not_enrolled", "free"
+    enrollment_count: int = 0  # Number of enrolled students
     thumbnail_url: Optional[str] = None
     category: Optional[str] = None
 
@@ -299,6 +300,21 @@ async def get_available_courses(student: TokenData = Depends(get_current_student
         enrollments_response = supabase_admin.table("enrollments").select("course_id").eq("student_id", student.user_id).eq("status", "active").execute()
         enrolled_course_ids = {enrollment["course_id"] for enrollment in enrollments_response.data or []}
         
+        # Get enrollment counts for each course
+        course_ids = [course["id"] for course in courses_response.data]
+        enrollment_counts = {}
+        if course_ids:
+            try:
+                counts_response = supabase_admin.table("enrollments").select("course_id", count="exact").in_("course_id", course_ids).eq("status", "active").execute()
+                # Note: Supabase doesn't return counts per course in a single query, so we'll fetch individually
+                for course_id in course_ids:
+                    count_response = supabase_admin.table("enrollments").select("id", count="exact").eq("course_id", course_id).eq("status", "active").execute()
+                    enrollment_counts[course_id] = count_response.count or 0
+            except Exception as e:
+                print(f"Error fetching enrollment counts: {e}")
+                # Set default count of 0 for all courses
+                enrollment_counts = {course_id: 0 for course_id in course_ids}
+        
         # Format response
         courses = []
         for course in courses_response.data:
@@ -320,6 +336,7 @@ async def get_available_courses(student: TokenData = Depends(get_current_student
                 is_paid=course["is_paid"],
                 teacher_name=teacher_name,
                 enrollment_status=enrollment_status,
+                enrollment_count=enrollment_counts.get(course["id"], 0),
                 thumbnail_url=course.get("thumbnail_url"),
                 category=course.get("category")
             ))

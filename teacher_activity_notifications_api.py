@@ -18,6 +18,11 @@ supabase: Client = create_client(supabase_url, supabase_key)
 
 router = APIRouter(prefix="/api/teacher-activity-notifications", tags=["teacher-activity-notifications"])
 
+@router.get("/test")
+async def test_teacher_activity_endpoint():
+    """Test endpoint to verify CORS and basic connectivity"""
+    return {"message": "Teacher activity notifications API is working", "status": "ok"}
+
 class TeacherActivityNotification(BaseModel):
     id: str
     type: str

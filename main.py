@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -51,16 +52,74 @@ def get_allowed_origins():
     # Add wildcard pattern for Vercel deployments
     origins.append("https://*.vercel.app")
     
+    # Add specific Vercel pattern matching
+    origins.extend([
+        "https://learn-sphere-frontend-black.vercel.app",
+        "https://learn-sphere-frontend-eapenthomas-projects.vercel.app",
+        "https://learn-sphere-frontend-git-main-eapenthomas-projects.vercel.app"
+    ])
+    
     return origins
 
-# Add CORS middleware
+# Add CORS middleware with comprehensive handling
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+# Add custom CORS handler for better wildcard support
+@app.middleware("http")
+async def custom_cors_handler(request: Request, call_next):
+    """Custom CORS handler for better wildcard support"""
+    origin = request.headers.get("origin")
+    
+    # Handle preflight requests
+    if request.method == "OPTIONS":
+        response = JSONResponse(content={"message": "OK"})
+        if origin:
+            # Check if origin matches any allowed pattern
+            allowed_origins = get_allowed_origins()
+            is_allowed = False
+            
+            for allowed_origin in allowed_origins:
+                if allowed_origin == "*" or origin == allowed_origin:
+                    is_allowed = True
+                    break
+                elif allowed_origin.endswith("*.vercel.app") and origin.endswith(".vercel.app"):
+                    is_allowed = True
+                    break
+            
+            if is_allowed:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+        return response
+    
+    response = await call_next(request)
+    
+    # Add CORS headers to response
+    if origin:
+        allowed_origins = get_allowed_origins()
+        is_allowed = False
+        
+        for allowed_origin in allowed_origins:
+            if allowed_origin == "*" or origin == allowed_origin:
+                is_allowed = True
+                break
+            elif allowed_origin.endswith("*.vercel.app") and origin.endswith(".vercel.app"):
+                is_allowed = True
+                break
+        
+        if is_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+    
+    return response
 
 # Add global exception handler for CORS
 @app.exception_handler(HTTPException)
@@ -99,7 +158,7 @@ try:
     
     # Import routers in order of importance (most used first)
     print("📦 Importing auth router...")
-    from auth import router as auth_router
+    from auth import router as auth_router, AuthService
     print(f"✅ Auth router imported: {auth_router}")
     from google_auth_v2 import router as google_auth_router
     print(f"✅ Google auth router imported (v2)")
@@ -408,6 +467,11 @@ async def test_auth_check():
 @app.get("/")
 async def root():
     return {"message": "Welcome to LearnSphere API", "docs": "/docs"}
+
+@app.get("/api/cors-test")
+async def cors_test():
+    """Test endpoint to verify CORS is working"""
+    return {"message": "CORS is working", "status": "ok", "timestamp": datetime.now().isoformat()}
 
 # Course categories endpoint (cached)
 @app.get("/api/courses/categories")

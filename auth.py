@@ -229,6 +229,16 @@ class AuthService:
             except Exception as e:
                 print(f"❌ Failed to store refresh token: {str(e)}")
 
+            # Update last_login timestamp
+            try:
+                current_time = datetime.now(timezone.utc).isoformat()
+                supabase_admin.table("profiles").update({
+                    "last_login": current_time
+                }).eq("id", user_id).execute()
+                print(f"✅ Last login updated for user {user_id}")
+            except Exception as e:
+                print(f"❌ Failed to update last login: {str(e)}")
+
             return AuthResponse(
                 access_token=access_token,
                 refresh_token=refresh_token,
@@ -280,7 +290,8 @@ class AuthService:
                 profile_data = {
                     "id": user_id,
                     "full_name": auth_response.user.user_metadata.get("full_name", email.split("@")[0]),
-                    "role": "student"
+                    "role": "student",
+                    "last_login": datetime.now(timezone.utc).isoformat()
                 }
                 supabase_admin.table("profiles").insert(profile_data).execute()
                 return AuthResponse(
@@ -306,6 +317,16 @@ class AuthService:
                         status_code=403,
                         detail="Your teacher account is pending approval. Please wait for admin approval."
                     )
+
+                # Update last_login timestamp for existing users
+                try:
+                    current_time = datetime.now(timezone.utc).isoformat()
+                    supabase_admin.table("profiles").update({
+                        "last_login": current_time
+                    }).eq("id", user_id).execute()
+                    print(f"✅ Last login updated for Google OAuth user {user_id}")
+                except Exception as e:
+                    print(f"❌ Failed to update last login for Google OAuth: {str(e)}")
 
                 return AuthResponse(
                     access_token=auth_response.session.access_token,

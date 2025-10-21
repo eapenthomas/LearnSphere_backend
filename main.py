@@ -22,6 +22,8 @@ def get_allowed_origins():
     origins = [
         "http://localhost:3000", 
         "http://127.0.0.1:3000",
+        "http://localhost:5173",  # Vite dev server
+        "http://127.0.0.1:5173",  # Vite dev server
         # Vercel frontend URLs
         "https://learn-sphere-frontend-black.vercel.app",
         "https://learn-sphere-frontend-eapenthomas-projects.vercel.app",
@@ -104,6 +106,8 @@ try:
     from auth_refresh_api import router as auth_refresh_router
     from notification_api import router as notification_router
     from notifications_api_enhanced import router as notifications_enhanced_router
+    from activity_notifications_api import router as activity_notifications_router
+    from teacher_activity_notifications_api import router as teacher_activity_notifications_router
     from course_completion_api import router as course_completion_router
     from course_api import router as course_router
     from enrollment_api import router as enrollment_router
@@ -208,6 +212,8 @@ try:
     app.include_router(auth_refresh_router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(notification_router)
     app.include_router(notifications_enhanced_router)
+    app.include_router(activity_notifications_router)
+    app.include_router(teacher_activity_notifications_router)
     app.include_router(course_completion_router)
     app.include_router(course_router)
     app.include_router(enrollment_router)

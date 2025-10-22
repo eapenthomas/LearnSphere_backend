@@ -6,6 +6,7 @@ Manages system-wide configuration settings including AI feature toggles
 import os
 import json
 from typing import Dict, Any, Optional
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from supabase import create_client, Client
@@ -99,35 +100,22 @@ async def update_system_settings(
 ):
     """Update system settings"""
     try:
-        # Convert settings to database format
-        settings_to_update = []
-        
+        # Update each setting individually using UPDATE instead of INSERT
         for category, category_settings in settings.dict().items():
             for key, value in category_settings.items():
-                # Determine setting type
+                # Convert value to string for storage
                 if isinstance(value, bool):
-                    setting_type = "boolean"
                     setting_value = str(value).lower()
                 elif isinstance(value, (int, float)):
-                    setting_type = "number"
                     setting_value = str(value)
                 else:
-                    setting_type = "string"
                     setting_value = str(value)
                 
-                settings_to_update.append({
-                    "category": category,
-                    "setting_key": key,
+                # Update the existing setting
+                supabase.table("system_settings").update({
                     "setting_value": setting_value,
-                    "setting_type": setting_type,
-                    "description": f"{category.title()} setting for {key}",
-                    "is_encrypted": False,
-                    "is_public": False
-                })
-        
-        # Upsert all settings
-        for setting in settings_to_update:
-            supabase.table("system_settings").upsert(setting).execute()
+                    "updated_at": datetime.now().isoformat()
+                }).eq("category", category).eq("setting_key", key).execute()
         
         return {"message": "Settings updated successfully"}
         

@@ -264,6 +264,13 @@ try:
     except ImportError as e:
         print(f"⚠️  Payment router failed to import: {e}")
         payment_router = None
+
+    try:
+        from system_settings_api import router as system_settings_router
+        print("✅ System settings router imported")
+    except ImportError as e:
+        print(f"⚠️  System settings router failed to import: {e}")
+        system_settings_router = None
     
     # Include routers in optimized order (most used first)
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -289,6 +296,10 @@ try:
     app.include_router(teacher_reports_router)
     app.include_router(teacher_rating_router)
     app.include_router(teacher_dashboard_router)
+    
+    # Include system settings router
+    if system_settings_router:
+        app.include_router(system_settings_router)
     
     # Include optional routers only if they were imported successfully
     if ai_usage_router:

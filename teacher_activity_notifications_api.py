@@ -192,83 +192,118 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
             })
         
         # 2. Assignment submissions received since last login
-        submissions_response = supabase.table("assignment_submissions").select("""
-            id, submitted_at, student_id, assignment_id, score,
-            assignments!inner(title, course_id),
-            courses!inner(title),
-            profiles!assignment_submissions_student_id_fkey(full_name)
-        """).in_("assignments.course_id", course_ids).gte("submitted_at", last_login).execute()
+        # First get all assignments for teacher's courses
+        teacher_assignments_response = supabase.table("assignments").select("id, title, course_id").in_("course_id", course_ids).execute()
+        teacher_assignment_ids = [a['id'] for a in teacher_assignments_response.data or []]
         
-        for submission in submissions_response.data or []:
-            student_name = submission.get('profiles', {}).get('full_name', 'Unknown Student')
-            assignment_title = submission.get('assignments', {}).get('title', 'Unknown Assignment')
-            course_title = submission.get('courses', {}).get('title', 'Unknown Course')
+        if teacher_assignment_ids:
+            # Now get submissions for these assignments
+            submissions_response = supabase.table("assignment_submissions").select("""
+                id, submitted_at, student_id, assignment_id, score,
+                profiles!assignment_submissions_student_id_fkey(full_name)
+            """).in_("assignment_id", teacher_assignment_ids).gte("submitted_at", last_login).execute()
             
-            activities.append({
-                'id': submission['id'],
-                'type': 'assignment_submission_received',
-                'title': f"Assignment Submitted: {assignment_title}",
-                'message': f"{student_name} submitted '{assignment_title}' in {course_title}",
-                'priority': 'high',
-                'created_at': submission['submitted_at'],
-                'activity_timestamp': submission['submitted_at'],
-                'action_url': f"/teacher/assignments/{submission['assignment_id']}/submissions",
-                'data': {
-                    'submission_id': submission['id'],
-                    'assignment_id': submission['assignment_id'],
-                    'student_id': submission['student_id'],
-                    'course_id': submission.get('assignments', {}).get('course_id'),
-                    'student_name': student_name,
-                    'assignment_title': assignment_title,
-                    'course_title': course_title
-                }
-            })
+            # Create a lookup for assignment details
+            assignment_lookup = {a['id']: a for a in teacher_assignments_response.data}
+            
+            for submission in submissions_response.data or []:
+                student_name = submission.get('profiles', {}).get('full_name', 'Unknown Student')
+                assignment_id = submission['assignment_id']
+                assignment_info = assignment_lookup.get(assignment_id, {})
+                assignment_title = assignment_info.get('title', 'Unknown Assignment')
+                course_id = assignment_info.get('course_id')
+                
+                # Get course title
+                course_title = 'Unknown Course'
+                if course_id:
+                    course_info = next((c for c in courses_response.data or [] if c['id'] == course_id), {})
+                    course_title = course_info.get('title', 'Unknown Course')
+                
+                activities.append({
+                    'id': submission['id'],
+                    'type': 'assignment_submission_received',
+                    'title': f"Assignment Submitted: {assignment_title}",
+                    'message': f"{student_name} submitted '{assignment_title}' in {course_title}",
+                    'priority': 'high',
+                    'created_at': submission['submitted_at'],
+                    'activity_timestamp': submission['submitted_at'],
+                    'action_url': f"/teacher/assignments/{submission['assignment_id']}/submissions",
+                    'data': {
+                        'submission_id': submission['id'],
+                        'assignment_id': submission['assignment_id'],
+                        'student_id': submission['student_id'],
+                        'course_id': course_id,
+                        'student_name': student_name,
+                        'assignment_title': assignment_title,
+                        'course_title': course_title
+                    }
+                })
         
         # 3. Quiz submissions received since last login
-        quiz_submissions_response = supabase.table("quiz_submissions").select("""
-            id, submitted_at, student_id, quiz_id, score,
-            quizzes!inner(title, course_id),
-            courses!inner(title),
-            profiles!quiz_submissions_student_id_fkey(full_name)
-        """).in_("quizzes.course_id", course_ids).gte("submitted_at", last_login).execute()
+        # First get all quizzes for teacher's courses
+        teacher_quizzes_response = supabase.table("quizzes").select("id, title, course_id").in_("course_id", course_ids).execute()
+        teacher_quiz_ids = [q['id'] for q in teacher_quizzes_response.data or []]
         
-        for submission in quiz_submissions_response.data or []:
-            student_name = submission.get('profiles', {}).get('full_name', 'Unknown Student')
-            quiz_title = submission.get('quizzes', {}).get('title', 'Unknown Quiz')
-            course_title = submission.get('courses', {}).get('title', 'Unknown Course')
+        if teacher_quiz_ids:
+            # Now get submissions for these quizzes
+            quiz_submissions_response = supabase.table("quiz_submissions").select("""
+                id, submitted_at, student_id, quiz_id, score,
+                profiles!quiz_submissions_student_id_fkey(full_name)
+            """).in_("quiz_id", teacher_quiz_ids).gte("submitted_at", last_login).execute()
             
-            activities.append({
-                'id': submission['id'],
-                'type': 'quiz_submission_received',
-                'title': f"Quiz Completed: {quiz_title}",
-                'message': f"{student_name} completed '{quiz_title}' in {course_title} with score {submission.get('score', 'N/A')}",
-                'priority': 'medium',
-                'created_at': submission['submitted_at'],
-                'activity_timestamp': submission['submitted_at'],
-                'action_url': f"/teacher/quizzes/{submission['quiz_id']}/results",
-                'data': {
-                    'submission_id': submission['id'],
-                    'quiz_id': submission['quiz_id'],
-                    'student_id': submission['student_id'],
-                    'course_id': submission.get('quizzes', {}).get('course_id'),
-                    'student_name': student_name,
-                    'quiz_title': quiz_title,
-                    'course_title': course_title,
-                    'score': submission.get('score')
-                }
-            })
+            # Create a lookup for quiz details
+            quiz_lookup = {q['id']: q for q in teacher_quizzes_response.data}
+            
+            for submission in quiz_submissions_response.data or []:
+                student_name = submission.get('profiles', {}).get('full_name', 'Unknown Student')
+                quiz_id = submission['quiz_id']
+                quiz_info = quiz_lookup.get(quiz_id, {})
+                quiz_title = quiz_info.get('title', 'Unknown Quiz')
+                course_id = quiz_info.get('course_id')
+                
+                # Get course title
+                course_title = 'Unknown Course'
+                if course_id:
+                    course_info = next((c for c in courses_response.data or [] if c['id'] == course_id), {})
+                    course_title = course_info.get('title', 'Unknown Course')
+                
+                activities.append({
+                    'id': submission['id'],
+                    'type': 'quiz_submission_received',
+                    'title': f"Quiz Completed: {quiz_title}",
+                    'message': f"{student_name} completed '{quiz_title}' in {course_title} with score {submission.get('score', 'N/A')}",
+                    'priority': 'medium',
+                    'created_at': submission['submitted_at'],
+                    'activity_timestamp': submission['submitted_at'],
+                    'action_url': f"/teacher/quizzes/{submission['quiz_id']}/results",
+                    'data': {
+                        'submission_id': submission['id'],
+                        'quiz_id': submission['quiz_id'],
+                        'student_id': submission['student_id'],
+                        'course_id': course_id,
+                        'student_name': student_name,
+                        'quiz_title': quiz_title,
+                        'course_title': course_title,
+                        'score': submission.get('score')
+                    }
+                })
         
         # 4. Forum questions asked since last login
         forum_questions_response = supabase.table("forum_posts").select("""
-            id, title, content, created_at, course_id, post_type,
-            courses!inner(title),
+            id, title, content, created_at, course_id, post_type, student_id,
             profiles!forum_posts_student_id_fkey(full_name)
         """).in_("course_id", course_ids).eq("post_type", "question").gte("created_at", last_login).execute()
         
         for question in forum_questions_response.data or []:
             student_name = question.get('profiles', {}).get('full_name', 'Unknown Student')
             question_title = question.get('title', 'Untitled Question')
-            course_title = question.get('courses', {}).get('title', 'Unknown Course')
+            course_id = question.get('course_id')
+            
+            # Get course title
+            course_title = 'Unknown Course'
+            if course_id:
+                course_info = next((c for c in courses_response.data or [] if c['id'] == course_id), {})
+                course_title = course_info.get('title', 'Unknown Course')
             
             activities.append({
                 'id': question['id'],
@@ -292,14 +327,19 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
         # 5. Course ratings received since last login
         ratings_response = supabase.table("course_ratings").select("""
             id, rating, review, created_at, course_id, student_id,
-            courses!inner(title),
             profiles!course_ratings_student_id_fkey(full_name)
         """).in_("course_id", course_ids).gte("created_at", last_login).execute()
         
         for rating in ratings_response.data or []:
             student_name = rating.get('profiles', {}).get('full_name', 'Unknown Student')
-            course_title = rating.get('courses', {}).get('title', 'Unknown Course')
+            course_id = rating.get('course_id')
             rating_value = rating.get('rating', 0)
+            
+            # Get course title
+            course_title = 'Unknown Course'
+            if course_id:
+                course_info = next((c for c in courses_response.data or [] if c['id'] == course_id), {})
+                course_title = course_info.get('title', 'Unknown Course')
             
             activities.append({
                 'id': rating['id'],
@@ -324,22 +364,28 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
         # 6. Course progress updates (students completing materials)
         progress_response = supabase.table("course_material_progress").select("""
             id, completed_at, student_id, course_id, material_id,
-            courses!inner(title),
-            course_materials!inner(title, material_type),
             profiles!course_material_progress_student_id_fkey(full_name)
         """).in_("course_id", course_ids).not_.is_("completed_at", "null").gte("completed_at", last_login).execute()
         
         for progress in progress_response.data or []:
             student_name = progress.get('profiles', {}).get('full_name', 'Unknown Student')
-            material_title = progress.get('course_materials', {}).get('title', 'Unknown Material')
-            material_type = progress.get('course_materials', {}).get('material_type', 'material')
-            course_title = progress.get('courses', {}).get('title', 'Unknown Course')
+            course_id = progress.get('course_id')
+            material_id = progress.get('material_id')
+            
+            # Get course title
+            course_title = 'Unknown Course'
+            if course_id:
+                course_info = next((c for c in courses_response.data or [] if c['id'] == course_id), {})
+                course_title = course_info.get('title', 'Unknown Course')
+            
+            # Get material title (simplified)
+            material_title = f"Material {material_id}" if material_id else "Unknown Material"
             
             activities.append({
                 'id': progress['id'],
                 'type': 'material_completed',
                 'title': f"Material Completed: {material_title}",
-                'message': f"{student_name} completed {material_type} '{material_title}' in {course_title}",
+                'message': f"{student_name} completed material '{material_title}' in {course_title}",
                 'priority': 'low',
                 'created_at': progress['completed_at'],
                 'activity_timestamp': progress['completed_at'],
@@ -351,7 +397,6 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
                     'material_id': progress['material_id'],
                     'student_name': student_name,
                     'material_title': material_title,
-                    'material_type': material_type,
                     'course_title': course_title
                 }
             })

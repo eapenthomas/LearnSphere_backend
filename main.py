@@ -67,7 +67,7 @@ app.add_middleware(
     allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Cache-Control", "Pragma"],
 )
 
 # Add custom CORS handler for better wildcard support
@@ -95,8 +95,9 @@ async def custom_cors_handler(request: Request, call_next):
             if is_allowed:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-                response.headers["Access-Control-Allow-Headers"] = "*"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma"
                 response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Max-Age"] = "86400"
         
         return response
     
@@ -483,6 +484,20 @@ async def root():
 async def cors_test():
     """Test endpoint to verify CORS is working"""
     return {"message": "CORS is working", "status": "ok", "timestamp": datetime.now().isoformat()}
+
+@app.options("/api/profile-pictures/{user_id}")
+async def profile_pictures_options(user_id: str):
+    """Handle OPTIONS requests for profile pictures endpoint"""
+    return JSONResponse(
+        content={"message": "OK"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
 
 # Course categories endpoint (cached)
 @app.get("/api/courses/categories")

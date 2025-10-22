@@ -1,12 +1,23 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from auth_middleware import get_current_user, TokenData
+from supabase import create_client, Client
 
 # Load environment variables
 load_dotenv()
+
+# Initialize Supabase client
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+if not supabase_url or not supabase_key:
+    raise ValueError("Missing Supabase configuration")
+
+supabase: Client = create_client(supabase_url, supabase_key)
 
 # Create FastAPI app with optimized settings
 app = FastAPI(
@@ -498,6 +509,34 @@ async def profile_pictures_options(user_id: str):
             "Access-Control-Max-Age": "86400"
         }
     )
+
+@app.get("/api/profile")
+async def get_user_profile(current_user: TokenData = Depends(get_current_user)):
+    """Get current user's profile information"""
+    try:
+        # Get user profile from Supabase
+        response = supabase.table("profiles").select("*").eq("id", current_user.user_id).single().execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        profile = response.data
+        
+        return {
+            "id": profile.get("id"),
+            "email": profile.get("email"),
+            "full_name": profile.get("full_name"),
+            "phone": profile.get("phone"),
+            "bio": profile.get("bio"),
+            "location": profile.get("location"),
+            "role": profile.get("role"),
+            "avatar_url": profile.get("avatar_url"),
+            "created_at": profile.get("created_at"),
+            "updated_at": profile.get("updated_at")
+        }
+    except Exception as e:
+        print(f"Error fetching profile: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch profile")
 
 # Course categories endpoint (cached)
 @app.get("/api/courses/categories")

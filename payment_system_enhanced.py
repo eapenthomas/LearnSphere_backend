@@ -148,10 +148,13 @@ def create_razorpay_order(amount: float, course_id: str, student_id: str) -> Dic
         }
     
     try:
+        # Create a shorter receipt ID (max 40 characters for Razorpay)
+        receipt_id = f"c_{course_id[:8]}_{student_id[:8]}"
+        
         order_data = {
             "amount": int(amount * 100),  # Convert to paise
             "currency": "INR",
-            "receipt": f"course_{course_id}_{student_id}",
+            "receipt": receipt_id,
             "notes": {
                 "course_id": course_id,
                 "student_id": student_id

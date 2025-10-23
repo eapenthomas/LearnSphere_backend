@@ -208,8 +208,10 @@ async def get_batch_dashboard_data(teacher_id: str, timeRange: str = "7d"):
             course_id = course['id']
             enrollment_count = enrollment_counts.get(course_id, 0)
             
-            # Calculate completion rate (simplified)
-            completion_rate = min(85, enrollment_count * 10)  # Mock completion rate
+            print(f"📊 Course: {course['title']} - Enrollment Count: {enrollment_count}")
+            
+            # Calculate completion rate (only if there are enrollments)
+            completion_rate = 0 if enrollment_count == 0 else min(85, enrollment_count * 10)
             
             course_performance.append({
                 'course_id': course_id,
@@ -217,7 +219,7 @@ async def get_batch_dashboard_data(teacher_id: str, timeRange: str = "7d"):
                 'course': course['title'],  # Add full course name for compatibility
                 'students': enrollment_count,
                 'enrollment_count': enrollment_count,  # Add alternative property name
-                'avgScore': min(95, 70 + (enrollment_count * 2)),  # Mock average score
+                'avgScore': 0 if enrollment_count == 0 else min(95, 70 + (enrollment_count * 2)),  # Only calculate if there are students
                 'completion_rate': completion_rate  # Add completion rate
             })
         

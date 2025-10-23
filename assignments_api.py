@@ -209,6 +209,42 @@ async def create_assignment(
         logger.error(f"Error creating assignment: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create assignment")
 
+@router.get("/teacher/{teacher_id}/pending-count")
+async def get_teacher_assignments_pending_count(teacher_id: str):
+    """Get pending submissions count for each assignment created by a teacher."""
+    try:
+        # Verify teacher role
+        await verify_teacher_role(teacher_id)
+        
+        # Get all assignments for the teacher
+        assignments_response = supabase.table("assignments").select("id, title, course_id").eq("teacher_id", teacher_id).eq("status", "active").execute()
+        
+        if not assignments_response.data:
+            return []
+        
+        # Get pending submissions count for each assignment
+        assignments_with_pending = []
+        for assignment in assignments_response.data:
+            # Count submissions that don't have a score (pending grading)
+            pending_response = supabase.table("assignment_submissions").select("id", count="exact").eq("assignment_id", assignment["id"]).is_("score", "null").execute()
+            
+            pending_count = pending_response.count if pending_response.count is not None else 0
+            
+            assignments_with_pending.append({
+                "assignment_id": assignment["id"],
+                "title": assignment["title"],
+                "course_id": assignment["course_id"],
+                "pending_count": pending_count
+            })
+        
+        return assignments_with_pending
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching teacher assignments pending count: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pending count")
+
 @router.get("/teacher/{teacher_id}", response_model=List[AssignmentResponse])
 async def get_teacher_assignments(
     teacher_id: str,

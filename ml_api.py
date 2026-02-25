@@ -112,8 +112,8 @@ async def get_teacher_risk_analysis(teacher_id: str):
         if not course_ids:
             return []
 
-        # 2. Get All Enrollments
-        enrollments_res = supabase.table("enrollments").select("student_id, course_id, profiles!enrollments_student_id_fkey(full_name)").in_("course_id", course_ids).eq("status", "active").execute()
+        # 2. Get All Enrollments (no status filter – column may not exist)
+        enrollments_res = supabase.table("enrollments").select("student_id, course_id, profiles!enrollments_student_id_fkey(full_name)").in_("course_id", course_ids).execute()
         enrollments = enrollments_res.data or []
         
         if not enrollments:

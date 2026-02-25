@@ -92,7 +92,7 @@ async def predict_performance(data: PredictionRequest):
 @router.get("/teacher/risk-analysis/{teacher_id}")
 async def get_teacher_risk_analysis(teacher_id: str):
     """
-    Fetch all students for a teacher and perform risk analysis on each.
+    Fetch all students for a teacher and perform risk analysis using batched queries.
     """
     if performance_model is None:
         raise HTTPException(status_code=503, detail="ML model not available")
@@ -105,57 +105,91 @@ async def get_teacher_risk_analysis(teacher_id: str):
 
         # 1. Get Teacher's Courses
         courses_res = supabase.table("courses").select("id, title").eq("teacher_id", teacher_id).execute()
-        courses = courses_res.data or []
-        course_ids = [c["id"] for c in courses]
+        courses_data = courses_res.data or []
+        course_ids = [c["id"] for c in courses_data]
+        course_map = {c["id"]: c["title"] for c in courses_data}
         
         if not course_ids:
             return []
 
-        # 2. Get All Enrollments for these courses
-        enrollments_res = supabase.table("enrollments").select("student_id, course_id, profiles!enrollments_student_id_fkey(full_name)").in_("course_id", course_ids).execute()
+        # 2. Get All Enrollments
+        enrollments_res = supabase.table("enrollments").select("student_id, course_id, profiles!enrollments_student_id_fkey(full_name)").in_("course_id", course_ids).eq("status", "active").execute()
         enrollments = enrollments_res.data or []
         
         if not enrollments:
             return []
 
+        student_ids = list(set([e["student_id"] for e in enrollments]))
+
+        # 3. Batch Fetch All Metrics (Massive optimization: reduction in HTTP calls)
+        # Quizzes & Submissions
+        quizzes_res = supabase.table("quizzes").select("id, course_id").in_("course_id", course_ids).execute()
+        all_q_ids = [q["id"] for q in quizzes_res.data or []]
+        quiz_submissions = []
+        if all_q_ids and student_ids:
+            qs_res = supabase.table("quiz_submissions").select("student_id, quiz_id, score, total_marks").in_("quiz_id", all_q_ids).in_("student_id", student_ids).execute()
+            quiz_submissions = qs_res.data or []
+
+        # Assignments & Submissions
+        assignments_res = supabase.table("assignments").select("id, course_id, max_score").in_("course_id", course_ids).execute()
+        all_a_ids = [a["id"] for a in assignments_res.data or []]
+        assign_submissions = []
+        if all_a_ids and student_ids:
+            asub_res = supabase.table("assignment_submissions").select("student_id, assignment_id, score").in_("assignment_id", all_a_ids).in_("student_id", student_ids).execute()
+            assign_submissions = asub_res.data or []
+
+        # Progress
+        progress_res = supabase.table("course_progress").select("student_id, course_id, overall_progress_percentage").in_("course_id", course_ids).in_("student_id", student_ids).execute()
+        all_progress = progress_res.data or []
+
+        # 4. Map data for quick lookup
+        qs_map = {} # (sid, cid) -> list of scores
+        for q in (quizzes_res.data or []):
+            qid, cid = q["id"], q["course_id"]
+            for s in quiz_submissions:
+                if s["quiz_id"] == qid:
+                    key = (s["student_id"], cid)
+                    if key not in qs_map: qs_map[key] = []
+                    if s["total_marks"] > 0:
+                        qs_map[key].append(s["score"] / s["total_marks"] * 100)
+
+        as_map = {} # (sid, cid) -> list of scores
+        as_counts = {} # (sid, cid) -> sub_count
+        course_a_total = {} # cid -> total_assignments
+        for a in (assignments_res.data or []):
+            aid, cid = a["id"], a["course_id"]
+            course_a_total[cid] = course_a_total.get(cid, 0) + 1
+            for s in assign_submissions:
+                if s["assignment_id"] == aid:
+                    key = (s["student_id"], cid)
+                    if key not in as_map: as_map[key] = []
+                    if (a.get("max_score") or 0) > 0:
+                        as_map[key].append(s["score"] / a["max_score"] * 100)
+                    as_counts[key] = as_counts.get(key, 0) + 1
+
+        prog_map = {(p["student_id"], p["course_id"]): p["overall_progress_percentage"] for p in all_progress}
+
+        # 5. Process and Predict
         results = []
-        
-        # 3. Process each student-course pair (Simplified for performance)
         for enrollment in enrollments:
-            student_id = enrollment["student_id"]
-            course_id = enrollment["course_id"]
-            student_name = enrollment.get("profiles", {}).get("full_name", "Unknown Student")
+            sid = enrollment["student_id"]
+            cid = enrollment["course_id"]
+            key = (sid, cid)
             
-            # Fetch features
-            quizzes_res = supabase.table("quizzes").select("id").eq("course_id", course_id).execute()
-            q_ids = [q["id"] for q in quizzes_res.data or []]
+            # Aggregate from memory
+            q_scores = qs_map.get(key, [])
+            quiz_score = sum(q_scores) / len(q_scores) if q_scores else 65
+            quiz_count = len(q_scores)
+
+            a_scores = as_map.get(key, [])
+            assign_score = sum(a_scores) / len(a_scores) if a_scores else 70
+            sub_count = as_counts.get(key, 0)
+            total_a = course_a_total.get(cid, 0)
+            sub_rate = sub_count / total_a if total_a > 0 else 0
             
-            quiz_score = 65  # Default
-            quiz_count = 0
-            if q_ids:
-                qs_res = supabase.table("quiz_submissions").select("score, total_marks").eq("student_id", student_id).in_("quiz_id", q_ids).execute()
-                qs_data = qs_res.data or []
-                quiz_count = len(qs_data)
-                if quiz_count > 0:
-                    quiz_score = sum((q["score"] / q["total_marks"] * 100) for q in qs_data if q["total_marks"] > 0) / quiz_count
+            comp_rate = prog_map.get(key, 0)
 
-            assign_res = supabase.table("assignments").select("id, max_score").eq("course_id", course_id).execute()
-            a_ids = [a["id"] for a in assign_res.data or []]
-            
-            assign_score = 70
-            sub_rate = 0
-            if a_ids:
-                asub_res = supabase.table("assignment_submissions").select("score, assignment_id").eq("student_id", student_id).in_("assignment_id", a_ids).execute()
-                asub_data = asub_res.data or []
-                sub_rate = len(asub_data) / len(a_ids)
-                if asub_data:
-                    max_map = {a["id"]: a["max_score"] for a in assign_res.data or []}
-                    assign_score = sum((s["score"] / max_map.get(s["assignment_id"], 100) * 100) for s in asub_data if max_map.get(s["assignment_id"], 0) > 0) / len(asub_data)
-
-            prog_res = supabase.table("course_progress").select("overall_progress_percentage").eq("student_id", student_id).eq("course_id", course_id).maybe_single().execute()
-            comp_rate = prog_res.data["overall_progress_percentage"] if prog_res.data else 0
-
-            # 4. Predict
+            # ML Prediction
             features = np.array([[quiz_score, assign_score, comp_rate, sub_rate, quiz_count]])
             prediction = float(performance_model.predict(features)[0])
             predicted_score = round(np.clip(prediction, 0, 100), 2)
@@ -165,9 +199,9 @@ async def get_teacher_risk_analysis(teacher_id: str):
             elif predicted_score <= 60: risk_level = "Moderate Risk"
             
             results.append({
-                "student_id": student_id,
-                "student_name": student_name,
-                "course_name": next((c["title"] for c in courses if c["id"] == course_id), "Unknown"),
+                "student_id": sid,
+                "student_name": enrollment.get("profiles", {}).get("full_name", "Unknown"),
+                "course_name": course_map.get(cid, "Unknown"),
                 "predicted_score": predicted_score,
                 "risk_level": risk_level,
                 "metrics": {
@@ -182,4 +216,6 @@ async def get_teacher_risk_analysis(teacher_id: str):
 
     except Exception as e:
         logger.error(f"Teacher Risk Analysis Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal server error")

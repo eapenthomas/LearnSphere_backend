@@ -199,6 +199,7 @@ try:
     from teacher_reports_api import router as teacher_reports_router
     from teacher_rating_api import router as teacher_rating_router
     from teacher_dashboard_optimized import router as teacher_dashboard_router
+    from dashboard_consolidated_api import router as dashboard_optimized_router
     
     # Import other routers (with error handling for optional dependencies)
     try:
@@ -315,6 +316,7 @@ try:
     app.include_router(teacher_reports_router)
     app.include_router(teacher_rating_router)
     app.include_router(teacher_dashboard_router)
+    app.include_router(dashboard_optimized_router)
     
     # Include system settings router
     if system_settings_router:

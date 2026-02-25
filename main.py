@@ -283,6 +283,13 @@ try:
     except ImportError as e:
         print(f"⚠️  System settings router failed to import: {e}")
         system_settings_router = None
+
+    try:
+        from ml_api import router as ml_router
+        print("✅ ML prediction router imported")
+    except ImportError as e:
+        print(f"⚠️  ML prediction router failed to import: {e}")
+        ml_router = None
     
     # Include routers in optimized order (most used first)
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -337,6 +344,9 @@ try:
         app.include_router(teacher_verification_router)
     if payment_router:
         app.include_router(payment_router)
+
+    if ml_router:
+        app.include_router(ml_router)
     
     print("✅ All modules loaded successfully")
     

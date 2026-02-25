@@ -288,14 +288,13 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
                     }
                 })
         
-        # 4. Forum questions asked since last login
-        forum_questions_response = supabase.table("forum_posts").select("""
-            id, title, content, created_at, course_id, post_type, student_id,
-            profiles!forum_posts_student_id_fkey(full_name)
-        """).in_("course_id", course_ids).eq("post_type", "question").gte("created_at", last_login).execute()
+        # 4. Forum questions asked since last login (no profiles FK on forum_posts)
+        forum_questions_response = supabase.table("forum_posts").select(
+            "id, title, content, created_at, course_id, post_type, student_id"
+        ).in_("course_id", course_ids).eq("post_type", "question").gte("created_at", last_login).execute()
         
         for question in forum_questions_response.data or []:
-            student_name = question.get('profiles', {}).get('full_name', 'Unknown Student')
+            student_name = question.get('student_name', 'A Student')  # no profiles join available
             question_title = question.get('title', 'Untitled Question')
             course_id = question.get('course_id')
             

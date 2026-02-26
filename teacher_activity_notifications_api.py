@@ -324,10 +324,10 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
                 }
             })
         
-        # 5. Course ratings received since last login
-        ratings_response = supabase.table("course_ratings").select(
+        # 5. Ratings received since last login (actual table: teacher_ratings, not course_ratings)
+        ratings_response = supabase.table("teacher_ratings").select(
             "id, rating, review, created_at, course_id, student_id"
-        ).in_("course_id", course_ids).gte("created_at", last_login).execute()
+        ).eq("teacher_id", teacher_id).gte("created_at", last_login).execute()
         
         for rating in ratings_response.data or []:
             student_name = rating.get('profiles', {}).get('full_name', 'Unknown Student')

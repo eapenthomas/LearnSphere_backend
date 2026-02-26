@@ -75,7 +75,7 @@ async def check_plagiarism(
     """
     Two-stage hybrid plagiarism check.
     - Stage 1: TF-IDF structural similarity (always runs, no API cost)
-    - Stage 2: OpenAI semantic similarity (only if Stage 1 >= 0.4)
+    - Stage 2: OpenAI semantic similarity (only if Stage 1 >= threshold)
     """
     supabase = get_supabase()
 
@@ -90,82 +90,89 @@ async def check_plagiarism(
     processed_text = preprocess_text(raw_text)
 
     # ------------------------------------------------------------------
-    # 2. Fetch existing submissions for the same assignment (excluding this one)
+    # 2. ALWAYS store submission_text immediately so future submissions
+    #    can compare against this one (even if this is the first submission)
     # ------------------------------------------------------------------
-    existing_res = supabase.table("assignment_submissions").select(
-        "id, student_id, embedding"
-    ).eq("assignment_id", assignment_id).neq("id", submission_id).execute()
+    try:
+        supabase.table("assignment_submissions").update(
+            {"submission_text": processed_text[:50000]}
+        ).eq("id", submission_id).execute()
+        logger.info(f"Stored submission_text for submission {submission_id}")
+    except Exception as e:
+        logger.warning(f"Could not store submission_text: {e}")
 
-    existing_subs = existing_res.data or []
-    existing_texts_raw: list[str] = []
-
-    # We need existing submission text. Since we stored embeddings, use them for Stage 2.
-    # For Stage 1, we need text — fetch file URLs and extract on-the-fly (best effort).
-    # Strategy: retrieve stored processed text from a separate query if available,
-    # otherwise use partial text from DB or skip non-embedded ones.
-
-    # For TF-IDF we try to get submission file_url processed texts
+    # ------------------------------------------------------------------
+    # 3. Fetch existing submissions for the same assignment (excluding this one)
+    # ------------------------------------------------------------------
     sub_texts_res = supabase.table("assignment_submissions").select(
-        "id, student_id, submission_text"
+        "id, student_id, submission_text, embedding"
     ).eq("assignment_id", assignment_id).neq("id", submission_id).execute()
 
-    sub_text_map = {
-        s["id"]: s.get("submission_text", "") or ""
-        for s in (sub_texts_res.data or [])
-    }
-    existing_texts_raw = [sub_text_map.get(s["id"], "") for s in existing_subs]
+    existing_subs = sub_texts_res.data or []
+
+    # Build text list for TF-IDF
+    existing_texts_raw = [s.get("submission_text", "") or "" for s in existing_subs]
 
     # ------------------------------------------------------------------
-    # 3. Stage 1 — TF-IDF Structural Similarity
+    # 4. Stage 1 — TF-IDF Structural Similarity
     # ------------------------------------------------------------------
     structural_score, best_structural_idx = compute_tfidf_similarity(
-        processed_text, [preprocess_text(t) for t in existing_texts_raw]
+        processed_text, [preprocess_text(t) for t in existing_texts_raw if t.strip()]
     )
-    logger.info(f"Stage 1 structural similarity: {structural_score}")
+    logger.info(f"Stage 1 structural similarity: {structural_score:.4f}  (compared against {len([t for t in existing_texts_raw if t.strip()])} submissions)")
 
     matched_student_id: Optional[str] = None
     semantic_score: Optional[float] = None
 
-    if structural_score < STAGE1_THRESHOLD:
-        # Low risk — skip OpenAI entirely
-        risk_level = "Low"
-        action_taken = risk_to_status(risk_level)
-        logger.info("Stage 1 score below threshold. Skipping Stage 2.")
-    else:
-        # ------------------------------------------------------------------
-        # 4. Stage 2 — OpenAI Semantic Similarity
-        # ------------------------------------------------------------------
-        logger.info("Stage 1 score >= threshold. Running Stage 2 (OpenAI).")
-        new_embedding = generate_embedding(processed_text)
-
-        if new_embedding:
-            # Store embedding in DB for the current submission
+    # Always generate and store embedding for this submission
+    # (enables semantic comparison for future submissions even if Stage 2 threshold not met)
+    new_embedding = generate_embedding(processed_text)
+    if new_embedding:
+        try:
             supabase.table("assignment_submissions").update(
                 {"embedding": new_embedding}
             ).eq("id", submission_id).execute()
+        except Exception as e:
+            logger.warning(f"Could not store embedding: {e}")
 
-            # Also store processed text for future TF-IDF comparisons
-            supabase.table("assignment_submissions").update(
-                {"submission_text": processed_text[:50000]}  # cap at 50k chars
-            ).eq("id", submission_id).execute()
+    if structural_score < STAGE1_THRESHOLD and len([t for t in existing_texts_raw if t.strip()]) > 0:
+        # Enough prior submissions exist and structural score is low → Low Risk, skip OpenAI
+        risk_level = "Low"
+        action_taken = risk_to_status(risk_level)
+        logger.info("Stage 1 below threshold. Skipping Stage 2.")
+    elif not existing_subs:
+        # No prior submissions — this is the first one, nothing to compare
+        risk_level = "Low"
+        action_taken = "Accepted"
+        logger.info("First submission for this assignment. No comparison possible yet.")
+    else:
+        # ------------------------------------------------------------------
+        # 5. Stage 2 — OpenAI Semantic Similarity
+        # ------------------------------------------------------------------
+        logger.info("Running Stage 2 (OpenAI semantic similarity).")
 
+        if new_embedding:
             # Compare against subs that have stored embeddings
-            semantic_score, matched_student_id = find_best_semantic_match(
-                new_embedding, existing_subs
-            )
-            # If structural match index found, prefer that student_id
-            if best_structural_idx >= 0 and best_structural_idx < len(existing_subs):
-                matched_student_id = existing_subs[best_structural_idx].get("student_id")
-
+            subs_with_embeddings = [s for s in existing_subs if s.get("embedding")]
+            if subs_with_embeddings:
+                semantic_score, matched_student_id = find_best_semantic_match(
+                    new_embedding, subs_with_embeddings
+                )
+                logger.info(f"Stage 2 semantic similarity: {semantic_score:.4f}")
+            else:
+                logger.warning("No prior submissions have embeddings yet. Using structural only.")
         else:
-            # OpenAI failed — fall back to structural result
-            logger.warning("OpenAI embedding generation failed. Using structural fallback.")
+            logger.warning("OpenAI embedding failed. Using structural fallback.")
+
+        # Prefer the structurally matched student_id if available
+        if best_structural_idx >= 0 and best_structural_idx < len(existing_subs):
+            matched_student_id = existing_subs[best_structural_idx].get("student_id")
 
         risk_level = classify_risk(structural_score, semantic_score)
         action_taken = risk_to_status(risk_level)
 
     # ------------------------------------------------------------------
-    # 5. Update submission record with plagiarism result
+    # 6. Update submission record with plagiarism result
     # ------------------------------------------------------------------
     update_payload = {
         "plagiarism_risk": risk_level,
@@ -178,10 +185,9 @@ async def check_plagiarism(
     supabase.table("assignment_submissions").update(update_payload).eq("id", submission_id).execute()
 
     # ------------------------------------------------------------------
-    # 6. Take action based on risk
+    # 7. Notify teacher if High risk
     # ------------------------------------------------------------------
     if risk_level == "High":
-        # Notify the teacher
         _notify_teacher_flagged(supabase, assignment_id, submission_id, current_user.user_id, semantic_score or structural_score)
 
     return {

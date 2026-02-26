@@ -163,8 +163,10 @@ async def get_teacher_risk_analysis(teacher_id: str):
                 if s["assignment_id"] == aid:
                     key = (s["student_id"], cid)
                     if key not in as_map: as_map[key] = []
-                    if (a.get("max_score") or 0) > 0:
-                        as_map[key].append(s["score"] / a["max_score"] * 100)
+                    max_sc = a.get("max_score") or 0
+                    raw_score = s.get("score")
+                    if raw_score is not None and max_sc > 0:
+                        as_map[key].append(raw_score / max_sc * 100)
                     as_counts[key] = as_counts.get(key, 0) + 1
 
         prog_map = {(p["student_id"], p["course_id"]): p["overall_progress_percentage"] for p in all_progress}

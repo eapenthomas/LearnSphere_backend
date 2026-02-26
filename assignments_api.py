@@ -81,6 +81,9 @@ class SubmissionResponse(BaseModel):
     student_name: Optional[str] = None
     student_email: Optional[str] = None
     is_late_submission: Optional[bool] = False
+    plagiarism_risk: Optional[str] = None
+    plagiarism_similarity: Optional[float] = None
+    plagiarism_status: Optional[str] = None
 
 class GradeSubmission(BaseModel):
     score: int

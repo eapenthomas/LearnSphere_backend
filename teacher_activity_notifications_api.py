@@ -288,8 +288,11 @@ async def get_teacher_activities_since_login(teacher_id: str, last_login: str) -
                     }
                 })
         
-        # 4. Forum questions — table 'forum_posts' does not exist in this schema, skip gracefully
-        forum_questions_response_data = []
+        # 4. Forum questions asked since last login (correct table: forum_questions)
+        forum_questions_response = supabase.table("forum_questions").select(
+            "id, title, content, created_at, course_id, student_id"
+        ).in_("course_id", course_ids).gte("created_at", last_login).execute()
+        forum_questions_response_data = forum_questions_response.data or []
         
         for question in forum_questions_response_data:
             student_name = question.get('student_name', 'A Student')  # no profiles join available

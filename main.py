@@ -200,7 +200,14 @@ try:
     from teacher_rating_api import router as teacher_rating_router
     from teacher_dashboard_optimized import router as teacher_dashboard_router
     from dashboard_consolidated_api import router as dashboard_optimized_router
-    
+
+    try:
+        from plagiarism_api import router as plagiarism_router
+        print("✅ Plagiarism router imported")
+    except ImportError as e:
+        print(f"⚠️  Plagiarism router failed to import: {e}")
+        plagiarism_router = None
+
     # Import other routers (with error handling for optional dependencies)
     try:
         from ai_usage_api import router as ai_usage_router
@@ -349,6 +356,9 @@ try:
 
     if ml_router:
         app.include_router(ml_router)
+
+    if plagiarism_router:
+        app.include_router(plagiarism_router)
     
     print("✅ All modules loaded successfully")
     

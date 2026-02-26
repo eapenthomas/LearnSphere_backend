@@ -6,7 +6,7 @@ Handles long documents via chunking and averaging.
 import os
 import logging
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ def cosine_similarity_embeddings(emb1: List[float], emb2: List[float]) -> float:
 def find_best_semantic_match(
     new_embedding: List[float],
     stored_submissions: List[dict],   # each dict must have 'student_id' + 'embedding'
-) -> tuple[float, Optional[str]]:
+) -> Tuple[float, Optional[str]]:
     """
     Compare new_embedding against all stored submission embeddings.
     Returns (best_score, matched_student_id).

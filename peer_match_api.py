@@ -5,10 +5,18 @@ Algorithm: complementarity = 0.6 × joint_coverage + 0.4 × profile_diversity
 """
 from fastapi import APIRouter, HTTPException, Query, Depends
 from auth_middleware import get_current_user, TokenData
-from supabase_client import get_supabase
+import os
+from supabase import create_client, Client
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
+
+def get_supabase_client() -> Client:
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not supabase_url or not supabase_key:
+        raise ValueError("Missing Supabase configuration")
+    return create_client(supabase_url, supabase_key)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/peer-match", tags=["Peer Match"])
@@ -53,7 +61,7 @@ async def get_peer_matches(
     Returns the top-N most complementary study partners for `student_id`
     within `course_id`, ranked by complementarity score.
     """
-    supabase = get_supabase()
+    supabase = get_supabase_client()
 
     try:
         # ── 1. Enrolled students in this course ──────────────────────────────
@@ -187,7 +195,7 @@ async def get_student_courses_for_match(
     current_user: TokenData = Depends(get_current_user),
 ):
     """Return enrolled courses for the peer-match course picker."""
-    supabase = get_supabase()
+    supabase = get_supabase_client()
     try:
         # Step 1: get enrolled course IDs
         enroll_res = supabase.table("enrollments").select("course_id").eq("student_id", student_id).eq("status", "active").execute()

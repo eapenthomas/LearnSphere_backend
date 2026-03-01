@@ -298,6 +298,13 @@ try:
     except ImportError as e:
         print(f"⚠️  ML prediction router failed to import: {e}")
         ml_router = None
+
+    try:
+        from peer_match_api import router as peer_match_router
+        print("✅ Peer match router imported")
+    except ImportError as e:
+        print(f"⚠️  Peer match router failed to import: {e}")
+        peer_match_router = None
     
     # Include routers in optimized order (most used first)
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -356,6 +363,9 @@ try:
 
     if ml_router:
         app.include_router(ml_router)
+
+    if peer_match_router:
+        app.include_router(peer_match_router)
 
     if plagiarism_router:
         app.include_router(plagiarism_router)

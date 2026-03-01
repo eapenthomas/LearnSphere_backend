@@ -189,14 +189,15 @@ async def get_student_courses_for_match(
     """Return enrolled courses for the peer-match course picker."""
     supabase = get_supabase()
     try:
-        res = supabase.table("enrollments").select("course_id, courses(id, title)").eq("student_id", student_id).eq("status", "active").execute()
-        courses = []
-        seen = set()
-        for row in (res.data or []):
-            c = row.get("courses") or {}
-            if c.get("id") and c["id"] not in seen:
-                courses.append({"id": c["id"], "title": c.get("title", "Unknown")})
-                seen.add(c["id"])
+        # Step 1: get enrolled course IDs
+        enroll_res = supabase.table("enrollments").select("course_id").eq("student_id", student_id).eq("status", "active").execute()
+        course_ids = list({e["course_id"] for e in (enroll_res.data or [])})
+        if not course_ids:
+            return []
+
+        # Step 2: get course titles
+        courses_res = supabase.table("courses").select("id, title").in_("id", course_ids).execute()
+        courses = [{"id": c["id"], "title": c.get("title", "Unknown")} for c in (courses_res.data or [])]
         return courses
     except Exception as e:
         logger.error(f"Error fetching courses for peer match: {e}")

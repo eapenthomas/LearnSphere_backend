@@ -324,19 +324,80 @@ async def review_submission(
     remark: str = Form(""),
     current_user: TokenData = Depends(get_current_user),
 ):
-    """Teacher approves or rejects a flagged submission."""
+    """Teacher approves or rejects a flagged submission.
+    - Reject: auto-zeroes score, sets status to 'reviewed', notifies student.
+    - Approve: notifies student that submission was cleared.
+    """
     supabase = get_supabase()
     try:
         if action not in ("approve", "reject"):
             raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
 
-        new_status = "Approved by Teacher" if action == "approve" else "Rejected by Teacher"
-        update = {"plagiarism_status": new_status}
+        # Fetch submission to get student_id and assignment_id
+        sub_res = supabase.table("assignment_submissions").select(
+            "id, student_id, assignment_id, score"
+        ).eq("id", submission_id).single().execute()
+
+        if not sub_res.data:
+            raise HTTPException(status_code=404, detail="Submission not found")
+
+        sub = sub_res.data
+        student_id = sub["student_id"]
+        assignment_id = sub["assignment_id"]
+
+        # Build the update payload
+        new_plagiarism_status = "Approved by Teacher" if action == "approve" else "Rejected by Teacher"
+        update: dict = {
+            "plagiarism_status": new_plagiarism_status,
+            "status": "reviewed",           # mark as reviewed regardless
+        }
         if remark:
             update["teacher_remark"] = remark
+        if action == "reject":
+            update["score"] = 0             # auto-zero on reject
 
         supabase.table("assignment_submissions").update(update).eq("id", submission_id).execute()
-        return {"message": f"Submission {action}d successfully.", "status": new_status}
+
+        # Fetch assignment title for the notification message
+        assign_res = supabase.table("assignments").select("title").eq("id", assignment_id).single().execute()
+        assign_title = assign_res.data.get("title", "an assignment") if assign_res.data else "an assignment"
+
+        # Build student notification
+        if action == "approve":
+            notif_title = f"✅ Plagiarism Review: Submission Approved"
+            notif_message = (
+                f"Your submission for \"{assign_title}\" was reviewed and approved by your teacher. "
+                f"No further action is required.{(' Remark: ' + remark) if remark else ''}"
+            )
+        else:
+            notif_title = f"❌ Plagiarism Review: Submission Rejected"
+            notif_message = (
+                f"Your submission for \"{assign_title}\" was rejected due to plagiarism concerns. "
+                f"Your score has been set to 0.{(' Remark: ' + remark) if remark else ''}"
+            )
+
+        notification = {
+            "user_id": student_id,
+            "title": notif_title,
+            "message": notif_message,
+            "type": "plagiarism_review",
+            "is_read": False,
+            "data": {
+                "submission_id": submission_id,
+                "assignment_id": assignment_id,
+                "action": action,
+            },
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        try:
+            supabase.table("notifications").insert(notification).execute()
+            logger.info(f"Student {student_id} notified of plagiarism {action}.")
+        except Exception as notif_err:
+            # Non-fatal — log and continue
+            logger.warning(f"Could not send student notification: {notif_err}")
+
+        return {"message": f"Submission {action}d successfully.", "status": new_plagiarism_status}
 
     except HTTPException:
         raise

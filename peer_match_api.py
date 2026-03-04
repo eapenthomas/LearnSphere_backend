@@ -143,9 +143,9 @@ async def get_peer_matches(
         candidates.sort(key=lambda x: x[1], reverse=True)
         top = candidates[:top_n]
 
-        # ── 9. Fetch profile names for matched students ───────────────────────
+        # ── 9. Fetch profile names and details for matched students ─────────────
         top_ids = [c[0] for c in top]
-        profiles_res = supabase.table("profiles").select("id, full_name, email").in_("id", top_ids).execute()
+        profiles_res = supabase.table("profiles").select("id, full_name, email, profile_picture").in_("id", top_ids).execute()
         profile_map  = {p["id"]: p for p in (profiles_res.data or [])}
 
         # ── 10. Build response ────────────────────────────────────────────────
@@ -167,6 +167,10 @@ async def get_peer_matches(
             matches.append({
                 "student_id":       sid,
                 "name":             first_name,
+                "full_name":        prof.get("full_name") or "Student",
+                "email":            prof.get("email") or "",
+                "bio":              "",
+                "avatar_url":       prof.get("profile_picture"),
                 "compatibility_pct": round(score * 100),
                 "their_strengths":  skills["strong"],
                 "their_weaknesses": skills["weak"],

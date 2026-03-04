@@ -52,86 +52,51 @@ async def get_dashboard_stats():
     try:
         print("Fetching optimized dashboard stats...")
 
-        # Use concurrent queries with specific field selection for better performance
+        # Define lambda functions for all synchronous Supabase queries
         import asyncio
+        queries = [
+            asyncio.to_thread(lambda: supabase.table('profiles').select('id', count='exact').eq('role', 'student').eq('is_active', True).execute()),
+            asyncio.to_thread(lambda: supabase.table('profiles').select('id', count='exact').eq('role', 'teacher').eq('is_active', True).eq('approval_status', 'approved').execute()),
+            asyncio.to_thread(lambda: supabase.table('profiles').select('id', count='exact').eq('role', 'teacher').eq('approval_status', 'pending').execute()),
+            asyncio.to_thread(lambda: supabase.table('profiles').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('courses').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('enrollments').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('assignments').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('quizzes').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('assignment_submissions').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('quiz_submissions').select('id', count='exact').execute()),
+            asyncio.to_thread(lambda: supabase.table('ai_usage_logs').select('tokens_used, cost_usd').execute())
+        ]
+        
+        # Execute all 11 queries concurrently for maximum performance
+        results = await asyncio.gather(*queries, return_exceptions=True)
+        
+        def safe_count(res):
+            if isinstance(res, Exception): return 0
+            if hasattr(res, 'count') and res.count is not None: return res.count
+            if hasattr(res, 'data') and res.data is not None: return len(res.data)
+            return 0
 
-        async def get_profile_counts():
-            """Get all profile-related counts in one optimized query"""
-            try:
-                # Use more efficient queries with specific filters
-                students_response = supabase.table('profiles').select('id', count='exact').eq('role', 'student').eq('is_active', True).execute()
-                
-                # Active teachers: either OCR passed (auto-approved) or manually approved
-                teachers_response = supabase.table('profiles').select('id', count='exact').eq('role', 'teacher').eq('is_active', True).eq('approval_status', 'approved').execute()
-                
-                # Pending teachers: OCR failed or manual verification waiting for admin approval
-                pending_response = supabase.table('profiles').select('id', count='exact').eq('role', 'teacher').eq('approval_status', 'pending').execute()
-                total_response = supabase.table('profiles').select('id', count='exact').execute()
-
-                active_students = students_response.count or 0
-                active_teachers = teachers_response.count or 0
-                pending_approvals = pending_response.count or 0
-                total_users = total_response.count or 0
-
-                return active_students, active_teachers, pending_approvals, total_users
-            except Exception as e:
-                print(f"Error getting profile counts: {e}")
-                return 0, 0, 0, 0
-
-        async def get_content_counts():
-            """Get content counts with minimal data transfer"""
-            # Use count queries where possible, otherwise select only IDs
-            courses_response = supabase.table('courses').select('id', count='exact').execute()
-            enrollments_response = supabase.table('enrollments').select('id', count='exact').execute()
-            assignments_response = supabase.table('assignments').select('id', count='exact').execute()
-            quizzes_response = supabase.table('quizzes').select('id', count='exact').execute()
-
-            active_courses = courses_response.count or 0
-            total_enrollments = enrollments_response.count or 0
-            total_assignments = assignments_response.count or 0
-            total_quizzes = quizzes_response.count or 0
-
-            return active_courses, total_enrollments, total_assignments, total_quizzes
-
-        async def get_submission_counts():
-            """Get submission counts efficiently"""
-            try:
-                assignment_subs_response = supabase.table('assignment_submissions').select('id', count='exact').execute()
-                assignment_subs = assignment_subs_response.count if hasattr(assignment_subs_response, 'count') else len(assignment_subs_response.data or [])
-            except Exception as e:
-                print(f"Error getting assignment submissions: {e}")
-                assignment_subs = 0
-            
-            try:
-                quiz_subs_response = supabase.table('quiz_submissions').select('id', count='exact').execute()
-                quiz_subs = quiz_subs_response.count if hasattr(quiz_subs_response, 'count') else len(quiz_subs_response.data or [])
-            except Exception as e:
-                print(f"Error getting quiz submissions: {e}")
-                quiz_subs = 0
-
-            return assignment_subs + quiz_subs
-
-        async def get_ai_usage():
-            """Get AI usage statistics efficiently"""
-            try:
-                ai_usage_response = supabase.table('ai_usage_logs').select('tokens_used, cost_usd').execute()
-                ai_data = ai_usage_response.data or []
-                ai_tokens_used = sum(record.get('tokens_used', 0) for record in ai_data)
-                ai_cost_usd = sum(record.get('cost_usd', 0.0) for record in ai_data)
-                return ai_tokens_used, ai_cost_usd
-            except:
-                return 0, 0.0
-
-        # Execute all queries concurrently for better performance
-        (active_students, active_teachers, pending_approvals, total_users), \
-        (active_courses, total_enrollments, total_assignments, total_quizzes), \
-        total_submissions, \
-        (ai_tokens_used, ai_cost_usd) = await asyncio.gather(
-            get_profile_counts(),
-            get_content_counts(),
-            get_submission_counts(),
-            get_ai_usage()
-        )
+        active_students = safe_count(results[0])
+        active_teachers = safe_count(results[1])
+        pending_approvals = safe_count(results[2])
+        total_users = safe_count(results[3])
+        
+        active_courses = safe_count(results[4])
+        total_enrollments = safe_count(results[5])
+        total_assignments = safe_count(results[6])
+        total_quizzes = safe_count(results[7])
+        
+        assignment_subs = safe_count(results[8])
+        quiz_subs = safe_count(results[9])
+        total_submissions = assignment_subs + quiz_subs
+        
+        ai_res = results[10]
+        ai_tokens_used = 0
+        ai_cost_usd = 0.0
+        if not isinstance(ai_res, Exception) and hasattr(ai_res, 'data') and ai_res.data:
+            ai_tokens_used = sum(record.get('tokens_used', 0) for record in ai_res.data)
+            ai_cost_usd = sum(record.get('cost_usd', 0.0) for record in ai_res.data)
 
         # Calculate system health
         active_users = active_students + active_teachers
@@ -164,13 +129,25 @@ async def get_dashboard_stats():
 async def get_recent_activity(limit: int = Query(10, ge=1, le=50)):
     """Get recent user activity logs"""
     try:
-        # Get recent user registrations
-        recent_users = supabase.table('profiles').select('id, full_name, role, created_at').order('created_at', desc=True).limit(limit).execute()
+        import asyncio
+        
+        # Get recent user registrations and course creations in parallel
+        users_fut = asyncio.to_thread(
+            lambda: supabase.table('profiles').select('id, full_name, role, created_at').order('created_at', desc=True).limit(limit).execute()
+        )
+        courses_fut = asyncio.to_thread(
+            lambda: supabase.table('courses').select('''
+                id, title, created_at,
+                profiles!courses_teacher_id_fkey(full_name)
+            ''').order('created_at', desc=True).limit(5).execute()
+        )
+        
+        recent_users, recent_courses = await asyncio.gather(users_fut, courses_fut)
         
         activity_logs = []
-        for user in recent_users.data:
+        for user in recent_users.data if recent_users else []:
             # Handle null names better
-            user_name = user.get('full_name', '').strip()
+            user_name = user.get('full_name', '').strip() if user.get('full_name') else ''
             if not user_name:
                 user_name = f"User {user['id'][:8]}"
             
@@ -182,13 +159,7 @@ async def get_recent_activity(limit: int = Query(10, ge=1, le=50)):
                 details=f"{user['role'].title()} account created"
             ))
         
-        # Get recent course creations
-        recent_courses = supabase.table('courses').select('''
-            id, title, created_at,
-            profiles!courses_teacher_id_fkey(full_name)
-        ''').order('created_at', desc=True).limit(5).execute()
-        
-        for course in recent_courses.data:
+        for course in recent_courses.data if recent_courses else []:
             # Handle teacher names better
             teacher_name = 'Unknown Teacher'
             if course.get('profiles') and course['profiles'].get('full_name'):
@@ -212,40 +183,7 @@ async def get_recent_activity(limit: int = Query(10, ge=1, le=50)):
         print(f"Error fetching activity logs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/user-growth", response_model=List[UserGrowthData])
-async def get_user_growth_data():
-    """Get user growth data for the last 6 months"""
-    try:
-        growth_data = []
-        now = datetime.now(timezone.utc)
-        
-        for i in range(6):
-            # Calculate month start and end
-            month_start = now.replace(day=1) - timedelta(days=i*30)
-            month_end = month_start + timedelta(days=30)
-            month_name = month_start.strftime('%b %Y')
-            
-            # Get students registered in this month
-            students_response = supabase.table('profiles').select('id').eq('role', 'student').gte('created_at', month_start.isoformat()).lt('created_at', month_end.isoformat()).execute()
-            students_count = len(students_response.data)
-            
-            # Get teachers registered in this month
-            teachers_response = supabase.table('profiles').select('id').eq('role', 'teacher').gte('created_at', month_start.isoformat()).lt('created_at', month_end.isoformat()).execute()
-            teachers_count = len(teachers_response.data)
-            
-            growth_data.append(UserGrowthData(
-                month=month_name,
-                students=students_count,
-                teachers=teachers_count
-            ))
-        
-        # Reverse to show oldest to newest
-        growth_data.reverse()
-        return growth_data
-        
-    except Exception as e:
-        print(f"Error fetching user growth data: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/system-health")
 async def get_system_health():

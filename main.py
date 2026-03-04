@@ -60,8 +60,10 @@ def get_allowed_origins():
     if additional_origins:
         origins.extend(additional_origins.split(','))
     
-    # Add wildcard pattern for Vercel deployments
+    # Add wildcard patterns for common deployments
     origins.append("https://*.vercel.app")
+    origins.append("https://*.github.io")
+    origins.append("https://*.onrender.com")
     
     # Add specific Vercel pattern matching
     origins.extend([
@@ -102,6 +104,12 @@ async def custom_cors_handler(request: Request, call_next):
                 elif allowed_origin.endswith("*.vercel.app") and origin.endswith(".vercel.app"):
                     is_allowed = True
                     break
+                elif allowed_origin.endswith("*.github.io") and origin.endswith(".github.io"):
+                    is_allowed = True
+                    break
+                elif allowed_origin.endswith("*.onrender.com") and origin.endswith(".onrender.com"):
+                    is_allowed = True
+                    break
             
             if is_allowed:
                 response.headers["Access-Control-Allow-Origin"] = origin
@@ -124,6 +132,12 @@ async def custom_cors_handler(request: Request, call_next):
                 is_allowed = True
                 break
             elif allowed_origin.endswith("*.vercel.app") and origin.endswith(".vercel.app"):
+                is_allowed = True
+                break
+            elif allowed_origin.endswith("*.github.io") and origin.endswith(".github.io"):
+                is_allowed = True
+                break
+            elif allowed_origin.endswith("*.onrender.com") and origin.endswith(".onrender.com"):
                 is_allowed = True
                 break
         
@@ -305,6 +319,13 @@ try:
     except ImportError as e:
         print(f"⚠️  Peer match router failed to import: {e}")
         peer_match_router = None
+
+    try:
+        from study_buddy_api import router as study_buddy_router
+        print("✅ Study buddy router imported")
+    except ImportError as e:
+        print(f"⚠️  Study buddy router failed to import: {e}")
+        study_buddy_router = None
     
     # Include routers in optimized order (most used first)
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -366,6 +387,9 @@ try:
 
     if peer_match_router:
         app.include_router(peer_match_router)
+
+    if study_buddy_router:
+        app.include_router(study_buddy_router)
 
     if plagiarism_router:
         app.include_router(plagiarism_router)

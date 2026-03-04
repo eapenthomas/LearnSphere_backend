@@ -195,10 +195,80 @@ async def fetch_quiz_deadlines(student_id: str, enrolled_courses: List[str]) -> 
         return []
 
 async def fetch_other_events(student_id: str, enrolled_courses: List[str]) -> List[DeadlineEvent]:
-    """Fetch other academic events (exams, projects, etc.)."""
-    # This is a placeholder for future implementation
-    # You can add more event types here as needed
-    return []
+    """Fetch other academic events (exams, projects, etc.) including Study Buddy Sessions."""
+    events = []
+    
+    if not enrolled_courses:
+        return events
+        
+    try:
+        # Fetch study buddy sessions the student is participating in
+        participant_res = supabase.table("study_session_participants") \
+            .select("session_id, status") \
+            .eq("student_id", student_id) \
+            .in_("status", ["going", "maybe"]) \
+            .execute()
+            
+        if participant_res.data:
+            session_ids = [record["session_id"] for record in participant_res.data]
+            
+            if session_ids:
+                # Fetch actual sessions, without the courses join to avoid FK errors
+                sessions_res = supabase.table("study_sessions") \
+                    .select("id, topic, course_id, start_time, duration_minutes, meeting_link") \
+                    .in_("id", session_ids) \
+                    .in_("course_id", enrolled_courses) \
+                    .execute()
+                    
+                # Setup map for course titles
+                course_map = {}
+                if sessions_res.data:
+                    c_ids = list(set([s["course_id"] for s in sessions_res.data]))
+                    courses_res = supabase.table("courses").select("id, title").in_("id", c_ids).execute()
+                    course_map = {c["id"]: c["title"] for c in (courses_res.data or [])}
+
+                for session in (sessions_res.data or []):
+                    # Safely extract course title
+                    course_title = course_map.get(session["course_id"], "Study Session")
+                    
+                    start_time_str = session.get("start_time")
+                    if not start_time_str:
+                        continue
+                        
+                    # Convert start_time to aware datetime for calendar rendering
+                    due_date = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                    
+                    # Compute priority
+                    now = datetime.now(timezone.utc)
+                    days_until = (due_date - now).days
+                    
+                    priority = "normal"
+                    if 0 <= days_until <= 1:
+                        priority = "high"
+                        
+                    duration = session.get('duration_minutes', 60)
+                    link = session.get('meeting_link', '')
+                    desc = f"Duration: {duration} mins"
+                    if link:
+                        desc += f" | Link: {link}"
+                        
+                    events.append(DeadlineEvent(
+                        id=str(session["id"]),
+                        title=f"Study Session: {session.get('topic', 'General')}",
+                        course_name=course_title,
+                        course_id=str(session["course_id"]),
+                        due_date=due_date,
+                        category="event",
+                        description=desc,
+                        status="active",
+                        priority=priority,
+                        submission_status="not_submitted"  # Placeholder
+                    ))
+                    
+    except Exception as e:
+        logger.error(f"Error fetching study sessions for calendar: {str(e)}")
+        
+    return events
 
 # API Routes
 @router.get("/deadlines", response_model=CalendarResponse)

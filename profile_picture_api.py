@@ -37,8 +37,8 @@ async def get_profile_picture(user_id: str):
         
         if not profile_picture_url:
             return JSONResponse(
-                status_code=404,
-                content={"message": "No profile picture found", "profile_picture": None}
+                status_code=200,
+                content={"message": "No profile picture found", "profile_picture": None, "profile_picture_url": None, "user_id": user_id}
             )
         
         return {

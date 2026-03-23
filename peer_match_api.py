@@ -10,6 +10,7 @@ from supabase import create_client, Client
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
+import cluster_utils
 
 def get_supabase_client() -> Client:
     supabase_url = os.getenv("SUPABASE_URL")
@@ -48,8 +49,32 @@ def _label_skills(vector: np.ndarray, labels: list[str], threshold_strong=0.7, t
     return {"strong": strong, "weak": weak}
 
 
-# ─── Main endpoint ────────────────────────────────────────────────────────────
+# ─── Student's enrolled courses (helper for frontend dropdown) ────────────────
 
+@router.get("/courses/{student_id}")
+async def get_student_courses_for_match(
+    student_id: str,
+    current_user: TokenData = Depends(get_current_user),
+):
+    """Return enrolled courses for the peer-match course picker."""
+    supabase = get_supabase_client()
+    try:
+        # Step 1: get enrolled course IDs
+        enroll_res = supabase.table("enrollments").select("course_id").eq("student_id", student_id).eq("status", "active").execute()
+        course_ids = list({e["course_id"] for e in (enroll_res.data or [])})
+        if not course_ids:
+            return []
+
+        # Step 2: get course titles
+        courses_res = supabase.table("courses").select("id, title").in_("id", course_ids).execute()
+        courses = [{"id": c["id"], "title": c.get("title", "Unknown")} for c in (courses_res.data or [])]
+        return courses
+    except Exception as e:
+        logger.error(f"Error fetching courses for peer match: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch courses")
+
+
+# ─── Main endpoint ────────────────────────────────────────────────────────────
 @router.get("/{course_id}")
 async def get_peer_matches(
     course_id: str,
@@ -132,13 +157,45 @@ async def get_peer_matches(
         # ── 8. Compute complementarity for the requesting student ─────────────
         vMe = student_vecs.get(student_id, empty_vec())
         my_skills = _label_skills(vMe, all_labels)
+        
+        # Determine cluster for requesting student
+        # We need their aggegated features. Since we have vMe, we can compute averages if we know which are quizzes vs assignments
+        # To avoid re-fetching, we can approximate avg straight from valid scores in vMe
+        my_q_scores = [vMe[i] for i in range(len(quizzes)) if vMe[i] > 0]
+        my_a_scores = [vMe[len(quizzes)+i] for i in range(len(assignments)) if vMe[len(quizzes)+i] > 0]
+        
+        my_avg_q = float(np.mean(my_q_scores)) if my_q_scores else 0.0
+        my_avg_a = float(np.mean(my_a_scores)) if my_a_scores else 0.0
+        my_comp_rate = len(my_a_scores) / len(assignments) if assignments else 0.0
+        
+        my_extended_features = cluster_utils.build_extended_features(vMe, my_avg_q, my_comp_rate, my_avg_a)
+        # But wait, our cluster model is trained ONLY on [avg_q, avg_a, comp_rate]!
+        my_cluster_features = np.array([my_avg_q, my_avg_a, my_comp_rate])
+        my_cluster_id = cluster_utils.predict_cluster(my_cluster_features)
 
         candidates = []
         for sid, vec in student_vecs.items():
             if sid == student_id:
                 continue
+            
+            # Peer's features
+            peer_q = [vec[i] for i in range(len(quizzes)) if vec[i] > 0]
+            peer_a = [vec[len(quizzes)+i] for i in range(len(assignments)) if vec[len(quizzes)+i] > 0]
+            peer_avg_q = float(np.mean(peer_q)) if peer_q else 0.0
+            peer_avg_a = float(np.mean(peer_a)) if peer_a else 0.0
+            peer_comp_rate = len(peer_a) / len(assignments) if assignments else 0.0
+            
+            peer_cluster_features = np.array([peer_avg_q, peer_avg_a, peer_comp_rate])
+            peer_cluster_id = cluster_utils.predict_cluster(peer_cluster_features)
+            
+            # Base score
             score = _complementarity(vMe, vec)
-            candidates.append((sid, score, vec))
+            
+            # Cross-cluster bonus (encourage pairing students from different profiles)
+            if my_cluster_id != -1 and peer_cluster_id != -1 and my_cluster_id != peer_cluster_id:
+                score += 0.05
+                
+            candidates.append((sid, score, vec, peer_cluster_id))
 
         candidates.sort(key=lambda x: x[1], reverse=True)
         top = candidates[:top_n]
@@ -150,7 +207,7 @@ async def get_peer_matches(
 
         # ── 10. Build response ────────────────────────────────────────────────
         matches = []
-        for sid, score, vec in top:
+        for sid, score, vec, peer_c_id in top:
             prof   = profile_map.get(sid, {})
             skills = _label_skills(vec, all_labels)
             # Topics where they can help me (they're strong, I'm weak)
@@ -171,16 +228,20 @@ async def get_peer_matches(
                 "email":            prof.get("email") or "",
                 "bio":              "",
                 "avatar_url":       prof.get("profile_picture"),
-                "compatibility_pct": round(score * 100),
+                "compatibility_pct": min(100, round(score * 100)),
                 "their_strengths":  skills["strong"],
                 "their_weaknesses": skills["weak"],
                 "can_help_me":      can_help_me,
                 "i_help_them":      i_help_them,
+                "peer_cluster":     peer_c_id,
+                "cluster_name":     cluster_utils.cluster_name(peer_c_id, 3) if peer_c_id != -1 else ""
             })
 
         return {
             "my_strengths": my_skills["strong"],
             "my_weaknesses": my_skills["weak"],
+            "my_cluster": my_cluster_id,
+            "my_cluster_name": cluster_utils.cluster_name(my_cluster_id, 3) if my_cluster_id != -1 else "",
             "matches": matches,
         }
 
@@ -191,26 +252,4 @@ async def get_peer_matches(
         raise HTTPException(status_code=500, detail="Failed to compute peer matches")
 
 
-# ─── Student's enrolled courses (helper for frontend dropdown) ────────────────
 
-@router.get("/courses/{student_id}")
-async def get_student_courses_for_match(
-    student_id: str,
-    current_user: TokenData = Depends(get_current_user),
-):
-    """Return enrolled courses for the peer-match course picker."""
-    supabase = get_supabase_client()
-    try:
-        # Step 1: get enrolled course IDs
-        enroll_res = supabase.table("enrollments").select("course_id").eq("student_id", student_id).eq("status", "active").execute()
-        course_ids = list({e["course_id"] for e in (enroll_res.data or [])})
-        if not course_ids:
-            return []
-
-        # Step 2: get course titles
-        courses_res = supabase.table("courses").select("id, title").in_("id", course_ids).execute()
-        courses = [{"id": c["id"], "title": c.get("title", "Unknown")} for c in (courses_res.data or [])]
-        return courses
-    except Exception as e:
-        logger.error(f"Error fetching courses for peer match: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch courses")

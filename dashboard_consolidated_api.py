@@ -94,25 +94,36 @@ async def get_student_dashboard_consolidated(student_id: str):
                 "progress": prog
             })
 
-        # Format upcoming assignments
+        # Format upcoming assignments — only unsubmitted + due within the next 7 days
         formatted_assignments = []
-        from datetime import timezone
+        from datetime import timezone, timedelta
         now = datetime.now(timezone.utc)
+        one_week_later = now + timedelta(days=7)
         
         course_dict = {e.get("course_id"): (e.get("courses") or {}).get("title", "Unknown Course") for e in enrollments}
 
-        raw_assignments = [a for a in assignments if a["submission_status"] == "not_submitted"]
-        for a in raw_assignments[:5]:
+        # Filter: not submitted + due date between now and 7 days from now
+        upcoming_unsubmitted = []
+        for a in assignments:
+            if a["submission_status"] != "not_submitted":
+                continue
             due_date_str = a.get("due_date")
-            days_until = 0
-            formatted_date = "No Due Date"
-            if due_date_str:
-                try:
-                    due_date = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
-                    days_until = max(0, (due_date - now).days)
-                    formatted_date = due_date.strftime("%b %d")
-                except:
-                    pass
+            if not due_date_str:
+                continue  # skip assignments without a due date
+            try:
+                due_date = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
+            except:
+                continue
+            # Only include if due date is in the future AND within the next 7 days
+            if now <= due_date <= one_week_later:
+                upcoming_unsubmitted.append((a, due_date))
+
+        # Sort by nearest deadline first
+        upcoming_unsubmitted.sort(key=lambda x: x[1])
+
+        for a, due_date in upcoming_unsubmitted[:5]:
+            days_until = max(0, (due_date - now).days)
+            formatted_date = due_date.strftime("%b %d")
                     
             formatted_assignments.append({
                 "id": a["id"],
